@@ -7,9 +7,9 @@ import type { SculptVisualSettings } from '@/lib/sculptControls'
 export type BackgroundAppearanceMode = 'dark' | 'light'
 
 export const DARK_BACKGROUND_BG = '#0e0e12'
-export const LIGHT_BACKGROUND_BG = '#ebe9e4'
+export const LIGHT_BACKGROUND_BG = '#d4d4d4'
 
-/** Partial overrides per appearance (palette + material tuned for the plate). */
+/** Partial overrides per appearance (plate color; material lives in `DEFAULT_SCULPT_VISUAL`). */
 export const BACKGROUND_THEME_SEED: Record<
   BackgroundAppearanceMode,
   Partial<SculptVisualSettings>
@@ -19,14 +19,5 @@ export const BACKGROUND_THEME_SEED: Record<
   },
   light: {
     bgColor: LIGHT_BACKGROUND_BG,
-    uMatR: 0.72,
-    uMatG: 0.52,
-    uMatB: 0.06,
-    uMetal: 0.48,
-    uShine: 0.44,
-    uBallMetal: 0.74,
-    uContrast: 1.06,
-    uValue: 0.96,
-    uRim: 0.06,
   },
 }

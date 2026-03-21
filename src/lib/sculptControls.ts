@@ -31,23 +31,30 @@ export type SculptVisualSettings = SculptUniformSnapshot & {
 }
 
 export const DEFAULT_SCULPT_VISUAL: SculptVisualSettings = {
-  uMatR: 201 / 255,
-  uMatG: 240 / 255,
-  uMatB: 16 / 255,
-  uHueShift: 0,
-  uSat: 1,
-  uValue: 1,
-  uContrast: 1,
-  uAmbient: 0,
+  uMatR: 0.796078431372549,
+  uMatG: 1,
+  uMatB: 0.058823529411764705,
+  uHueShift: 0.025,
+  uSat: 1.37,
+  uValue: 1.92,
+  uContrast: 1.6,
+  uAmbient: 0.015,
   uRim: 0,
-  uMetal: 0.52,
-  uShine: 0.38,
-  uBallMetal: 0.78,
+  uMetal: 0.67,
+  uShine: 0.66,
+  uBallMetal: 0.69,
   uPosX: 0,
   uPosY: 0,
   uPosZ: 0,
   _scale: 1,
   bgColor: '#0e0e12',
+}
+
+/** Author default transforms per viewport tier (merged on top of theme slice). */
+export const DEFAULT_PER_BREAKPOINT_TRANSFORM_OVERRIDES: Partial<
+  Record<ViewportBreakpointId, Pick<SculptUniformSnapshot, 'uPosX' | 'uPosY' | 'uPosZ' | '_scale'>>
+> = {
+  xl: { uPosX: 0.52, uPosY: 0, uPosZ: 0, _scale: 1.31 },
 }
 
 export type PerBreakpointSculptSettings = Record<ViewportBreakpointId, SculptVisualSettings>
@@ -154,7 +161,11 @@ export function defaultPerBreakpointForTheme(
   const seed = defaultSculptSliceForTheme(mode)
   const row = {} as PerBreakpointSculptSettings
   for (const id of VIEWPORT_BREAKPOINT_ORDER) {
-    row[id] = { ...seed }
+    const t = DEFAULT_PER_BREAKPOINT_TRANSFORM_OVERRIDES[id]
+    row[id] = sanitizeSculptVisualSettings({
+      ...seed,
+      ...(t ?? {}),
+    })
   }
   return row
 }

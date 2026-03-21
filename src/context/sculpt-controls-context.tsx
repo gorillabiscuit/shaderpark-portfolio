@@ -11,6 +11,7 @@ import {
 } from 'react'
 import type { BackgroundAppearanceMode } from '@/config/backgroundTheme'
 import {
+  DEFAULT_PER_BREAKPOINT_TRANSFORM_OVERRIDES,
   DEFAULT_SCULPT_VISUAL,
   defaultSculptSliceForTheme,
   hexToRgb01,
@@ -175,7 +176,10 @@ export function SculptControlsProvider({ children }: { children: ReactNode }) {
   )
 
   const resetEditSlice = useCallback(() => {
-    const row = defaultSculptSliceForTheme(backgroundAppearanceMode)
+    const row = sanitizeSculptVisualSettings({
+      ...defaultSculptSliceForTheme(backgroundAppearanceMode),
+      ...(DEFAULT_PER_BREAKPOINT_TRANSFORM_OVERRIDES[editBreakpoint] ?? {}),
+    })
     setPerBreakpoint((prev) => ({
       ...prev,
       [editBreakpoint]: row,

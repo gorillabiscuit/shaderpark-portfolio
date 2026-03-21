@@ -12,20 +12,20 @@ export const backgroundSculptSource = `
 setGeometryQuality(88);
 setMaxIterations(420);
 
-var uMatR = input(0.7882353, 0, 1);
-var uMatG = input(0.9411765, 0, 1);
-var uMatB = input(0.0627451, 0, 1);
+var uMatR = input(0.796078431372549, 0, 1);
+var uMatG = input(1, 0, 1);
+var uMatB = input(0.058823529411764705, 0, 1);
 
-var uHueShift = input(0, -1, 1);
-var uSat = input(1, 0, 2);
-var uValue = input(1, 0, 2);
-var uContrast = input(1, 0.35, 2.2);
-var uAmbient = input(0, 0, 0.35);
+var uHueShift = input(0.025, -1, 1);
+var uSat = input(1.37, 0, 2);
+var uValue = input(1.92, 0, 2);
+var uContrast = input(1.6, 0.35, 2.2);
+var uAmbient = input(0.015, 0, 0.35);
 var uRim = input(0, 0, 1);
 
-var uMetal = input(0.52, 0, 1);
-var uShine = input(0.38, 0, 1);
-var uBallMetal = input(0.78, 0, 1);
+var uMetal = input(0.67, 0, 1);
+var uShine = input(0.66, 0, 1);
+var uBallMetal = input(0.69, 0, 1);
 
 var uPosX = input(0, -0.85, 0.85);
 var uPosY = input(0, -0.85, 0.85);
