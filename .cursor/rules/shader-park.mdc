@@ -1,0 +1,33 @@
+---
+description: Shader Park.js integration — use official APIs and docs, not raw WebGL
+globs: "**/shader-park/**,**/ShaderPark*.tsx,**/backgroundSculpt.ts"
+alwaysApply: true
+---
+
+# Shader Park in this project
+
+## Authoritative references
+
+- **JS sculpture API (geometry, materials, `mouse`, `time`, etc.)**: [docs.shaderpark.com/references-js](https://docs.shaderpark.com/references-js/) — source repo: [shader-park/shader-park-docs](https://github.com/shader-park/shader-park-docs)
+- **GLSL side (`surfaceDistance` / `shade` naming)**: same site under references (see [references README](https://github.com/shader-park/shader-park-docs/blob/master/docs/references/README.md))
+- **Runnable integration patterns**: [shader-park/shader-park-examples](https://github.com/shader-park/shader-park-examples) (e.g. `es6-production-template` uses `shader-park-core` + minimal renderer)
+- **Package**: `shader-park-core` on npm ([shader-park-core](https://www.npmjs.com/package/shader-park-core))
+
+## Do / don’t
+
+- **Do** express the sculpture as **Shader Park JS** (or the documented GLSL entry points), and compile/render via **`shader-park-core`** exports such as `sculptToMinimalRenderer`, `sculptToGLSL`, `generatedGLSLToMinimalRenderer`, or Three.js helpers like `createSculpture` when you need a full Three scene.
+- **Do** use built-ins from the docs for interaction: e.g. `mouse`, `time`, `getRayDirection`, `input()` where you need external data — not ad-hoc DOM → uniform wiring unless the docs say so.
+- **Don’t** replace the pipeline with hand-written WebGL calls, `canvas.getContext('webgl2')` shader strings, or Three.js materials that bypass Shader Park compilation **unless** you are intentionally leaving Shader Park for a specific reason and document it.
+- **Don’t** fight the minimal renderer’s assumptions: it sizes the drawing buffer from **window** dimensions and starts a **requestAnimationFrame** loop with **no public dispose** in `shader-park-core` 0.2.8. Prefer a **stable mount** for the canvas (e.g. one background layer at app root); avoid frequent unmount/remount (including toggling routes that destroy the canvas) unless you switch to a target with explicit teardown (e.g. Three.js `WebGLRenderer.dispose()`).
+
+## FAQ gotchas (from upstream docs)
+
+- Artifacting / distortion often means adjusting **geometry quality** / step settings — see global settings in the [references-js index](https://github.com/shader-park/shader-park-docs/blob/master/docs/references-js/README.md).
+- Branching on built-ins like `time` with `if` is called out as problematic in the same FAQ; prefer `mix`, `smoothstep`, etc.
+
+## This repo’s wiring
+
+- Sculpture source lives in `src/shader-park/backgroundSculpt.ts`.
+- React mounts the canvas in `src/components/ShaderParkBackground.tsx` using `sculptToMinimalRenderer`, aligned with [es6-production-template/index.js](https://github.com/shader-park/shader-park-examples/blob/main/es6-production-template/index.js).
+- Vite resolves `shader-park-core` to the **ESM** build (`dist/shader-park-core.esm.js`). The library uses `eval` internally for JS→GLSL compilation; expect Rollup warnings unless upstream changes.
+- The background is **lazy-loaded** in `App.tsx` so the initial route bundle stays smaller; the sculpture still runs from a single long-lived canvas at app root.
