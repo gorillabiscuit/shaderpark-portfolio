@@ -1,6 +1,14 @@
-import { useEffect, useRef } from 'react'
+import { useEffect, useRef, type MutableRefObject } from 'react'
 import { sculptToMinimalRenderer } from 'shader-park-core'
 import { installGlobalMouseForShaderParkCanvas } from '@/lib/shaderParkGlobalMouse'
+import {
+  DEFAULT_SCULPT_VISUAL,
+  hexToRgb01,
+  sanitizeUniformSnapshot,
+  toUniformSnapshot,
+  type SculptUniformSnapshot,
+} from '@/lib/sculptControls'
+import { installShaderParkMinimalRendererOverrides } from '@/lib/shaderParkWebglOverrides'
 import { backgroundSculptSource } from '@/shader-park/backgroundSculpt'
 import { cn } from '@/lib/utils'
 
@@ -20,6 +28,18 @@ export type ShaderParkBackgroundProps = {
    * When false, uses stock shader-park-core behavior (only when moving over the canvas).
    */
   globalMouse?: boolean
+  /**
+   * When set, each frame reads this ref for `input()` uniforms and `_scale`.
+   * Omit to use static defaults (e.g. embed).
+   */
+  uniformsRef?: MutableRefObject<SculptUniformSnapshot>
+  /** When set, overrides hard-coded white `gl.clearColor` in shader-park minimal renderer. */
+  clearRgbRef?: MutableRefObject<{ r: number; g: number; b: number }>
+  /**
+   * When `globalMouse` is on and this ref is `true`, viewport pointer moves are not forwarded
+   * to the shader (mouse uniform stays at last value).
+   */
+  ignoreGlobalPointerRef?: MutableRefObject<boolean>
 }
 
 /**
@@ -36,29 +56,64 @@ export function ShaderParkBackground({
   variant = 'fullscreen',
   className,
   globalMouse = true,
+  uniformsRef: uniformsRefProp,
+  clearRgbRef: clearRgbRefProp,
+  ignoreGlobalPointerRef,
 }: ShaderParkBackgroundProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null)
+  const fallbackUniformsRef = useRef<SculptUniformSnapshot>(
+    toUniformSnapshot(DEFAULT_SCULPT_VISUAL),
+  )
+  const uniformsRef = uniformsRefProp ?? fallbackUniformsRef
+  const embedClearRgbRef = useRef(hexToRgb01('#f4f4f2'))
+  const clearRgbRef = clearRgbRefProp ?? embedClearRgbRef
 
   useEffect(() => {
     const canvas = canvasRef.current
     if (!canvas) return
 
-    const uninstallGlobal =
-      globalMouse ? installGlobalMouseForShaderParkCanvas(canvas) : () => {}
+    const uninstallGlobal = globalMouse
+      ? installGlobalMouseForShaderParkCanvas(canvas, {
+          ignorePointerRef: ignoreGlobalPointerRef,
+        })
+      : () => {}
 
-    sculptToMinimalRenderer(canvas, backgroundSculptSource)
+    sculptToMinimalRenderer(canvas, backgroundSculptSource, () => {
+      const u = sanitizeUniformSnapshot(uniformsRef.current)
+      return {
+        uMatR: u.uMatR,
+        uMatG: u.uMatG,
+        uMatB: u.uMatB,
+        uMetal: u.uMetal,
+        uShine: u.uShine,
+        uBallMetal: u.uBallMetal,
+        uPosX: u.uPosX,
+        uPosY: u.uPosY,
+        uPosZ: u.uPosZ,
+        _scale: u._scale,
+      }
+    })
+
+    const gl = canvas.getContext('webgl2') as WebGL2RenderingContext | null
+    const removeOverrides =
+      gl != null
+        ? installShaderParkMinimalRendererOverrides(gl, {
+            clearRgbRef,
+          })
+        : () => {}
 
     return () => {
+      removeOverrides()
       uninstallGlobal()
     }
-  }, [globalMouse])
+  }, [globalMouse, uniformsRef, clearRgbRef, ignoreGlobalPointerRef])
 
   return (
     <canvas
       ref={canvasRef}
       className={cn(
         'pointer-events-none block h-full w-full',
-        variant === 'fullscreen' && 'fixed inset-0 -z-10',
+        variant === 'fullscreen' && 'fixed inset-0 z-[1]',
         variant === 'inline' && 'absolute inset-0',
         className,
       )}

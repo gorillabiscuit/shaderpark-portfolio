@@ -6,8 +6,8 @@ import { QueryProvider } from '@/providers/query-provider'
 import { ThemeProvider } from '@/providers/theme-provider'
 import App from './App'
 
-vi.mock('@/components/ShaderParkBackground', () => ({
-  ShaderParkBackground: () => null,
+vi.mock('@/components/AppShaderDock', () => ({
+  default: () => null,
 }))
 
 function AllProviders({ children }: { children: ReactNode }) {

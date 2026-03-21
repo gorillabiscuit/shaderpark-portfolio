@@ -1,5 +1,12 @@
+import type { MutableRefObject } from 'react'
+
 /** Matches SpThreeVue hover smoothing: each frame ~ lerp(prev, target, 1 - hoverInterpolation). */
 const POINTER_SMOOTH = 0.92
+
+export type GlobalMouseForShaderParkOptions = {
+  /** When `true`, skip forwarding pointer moves (e.g. while animation is paused). */
+  ignorePointerRef?: MutableRefObject<boolean>
+}
 
 /**
  * shader-park-core's minimal renderer only listens to pointermove on the canvas.
@@ -7,7 +14,11 @@ const POINTER_SMOOTH = 0.92
  * math tracks the cursor across the whole viewport (like shaderpark.com).
  * NDC is exponentially smoothed (similar to their smoothed hover/click uniforms).
  */
-export function installGlobalMouseForShaderParkCanvas(canvas: HTMLCanvasElement): () => void {
+export function installGlobalMouseForShaderParkCanvas(
+  canvas: HTMLCanvasElement,
+  options?: GlobalMouseForShaderParkOptions,
+): () => void {
+  const ignorePointerRef = options?.ignorePointerRef
   const cleanups: (() => void)[] = []
   const origAdd = canvas.addEventListener.bind(canvas)
   let sx = 0
@@ -21,6 +32,7 @@ export function installGlobalMouseForShaderParkCanvas(canvas: HTMLCanvasElement)
   ) => {
     if (type === 'pointermove' && typeof listener === 'function') {
       const onWindow = (e: PointerEvent) => {
+        if (ignorePointerRef?.current) return
         const iw = window.innerWidth || 1
         const ih = window.innerHeight || 1
         const nx = (2 * e.clientX) / iw - 1

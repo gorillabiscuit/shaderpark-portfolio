@@ -1,11 +1,11 @@
 import { lazy, Suspense } from 'react'
 import { Route, Routes, useLocation } from 'react-router-dom'
+import { SculptControlPanel } from '@/components/SculptControlPanel'
+import { SculptControlsProvider } from '@/context/sculpt-controls-context'
 import { EmbedPage } from '@/pages/EmbedPage'
 import { HomePage } from '@/pages/HomePage'
 
-const ShaderParkBackground = lazy(() =>
-  import('@/components/ShaderParkBackground').then((m) => ({ default: m.ShaderParkBackground })),
-)
+const AppShaderDock = lazy(() => import('@/components/AppShaderDock'))
 
 function App() {
   const isEmbed = useLocation().pathname === '/embed'
@@ -13,9 +13,12 @@ function App() {
   return (
     <>
       {!isEmbed && (
-        <Suspense fallback={null}>
-          <ShaderParkBackground variant="fullscreen" />
-        </Suspense>
+        <SculptControlsProvider>
+          <Suspense fallback={null}>
+            <AppShaderDock />
+          </Suspense>
+          <SculptControlPanel />
+        </SculptControlsProvider>
       )}
       <Routes>
         <Route path="/" element={<HomePage />} />

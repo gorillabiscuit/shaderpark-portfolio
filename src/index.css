@@ -67,4 +67,8 @@
     @apply min-h-screen bg-background text-foreground antialiased;
     margin: 0;
   }
+  /* Contain z-0 / z-[1] stacking for Shader Park canvas vs backdrop */
+  #root {
+    isolation: isolate;
+  }
 }
