@@ -11,16 +11,21 @@ import {
 } from 'react'
 import type { BackgroundAppearanceMode } from '@/config/backgroundTheme'
 import {
-  DEFAULT_PER_BREAKPOINT_TRANSFORM_OVERRIDES,
   DEFAULT_SCULPT_VISUAL,
+  buildPanelsByTheme,
   defaultSculptSliceForTheme,
+  defaultTransformsPerBreakpoint,
+  extractAppearance,
+  extractTransform,
   hexToRgb01,
-  loadSculptPanelsByTheme,
+  loadSculptStorageState,
+  mergeVisual,
   sanitizeSculptVisualSettings,
-  saveSculptPanelsByTheme,
+  saveSculptStorageState,
   toUniformSnapshot,
   type PerBreakpointSculptSettings,
   type SculptPanelsByTheme,
+  type SculptStorageState,
   type SculptVisualSettings,
 } from '@/lib/sculptControls'
 import { useTheme } from 'next-themes'
@@ -28,6 +33,7 @@ import {
   activeViewportBreakpoint,
   breakpointMinWidth,
   TAILWIND_MIN_WIDTHS,
+  VIEWPORT_BREAKPOINT_ORDER,
   type ViewportBreakpointId,
 } from '@/lib/viewportBreakpoint'
 
@@ -38,7 +44,7 @@ type SculptControlsContextValue = {
   uniformsRef: MutableRefObject<ReturnType<typeof toUniformSnapshot>>
   /** WebGL clear RGB (sRGB 0–1); read each frame by ShaderParkBackground patches. */
   clearRgbRef: MutableRefObject<{ r: number; g: number; b: number }>
-  /** Derived from site theme (`next-themes`). Separate sculpt presets per mode. */
+  /** Derived from site theme (`next-themes`). Separate appearance per mode; transforms shared. */
   backgroundAppearanceMode: BackgroundAppearanceMode
   /** Same as `timePaused`; for listeners that must read latest without effect deps. */
   timePausedRef: MutableRefObject<boolean>
@@ -58,7 +64,7 @@ type SculptControlsContextValue = {
     breakpoint: ViewportBreakpointId,
     patch: Partial<SculptVisualSettings>,
   ) => void
-  /** Full storage; use for reading sibling theme fields in the panel. */
+  /** Full merged panels for UI (dark/light × breakpoints). */
   panelsByTheme: SculptPanelsByTheme
   resetEditSlice: () => void
 }
@@ -76,13 +82,15 @@ export function SculptControlsProvider({ children }: { children: ReactNode }) {
   const backgroundAppearanceMode: BackgroundAppearanceMode =
     resolvedTheme === 'light' ? 'light' : 'dark'
 
-  const uniformsRef = useRef(toUniformSnapshot(DEFAULT_SCULPT_VISUAL))
-  const clearRgbRef = useRef(hexToRgb01(DEFAULT_SCULPT_VISUAL.bgColor))
+  const uniformsRef = useRef(toUniformSnapshot(defaultSculptSliceForTheme('dark')))
+  const clearRgbRef = useRef(hexToRgb01(defaultSculptSliceForTheme('dark').bgColor))
   const [timePaused, setTimePaused] = useState(false)
   const timePausedRef = useRef(timePaused)
   timePausedRef.current = timePaused
   const [sculptPanelOpen, setSculptPanelOpen] = useState(false)
-  const [panelsByTheme, setPanelsByTheme] = useState<SculptPanelsByTheme>(loadSculptPanelsByTheme)
+  const [storage, setStorage] = useState<SculptStorageState>(loadSculptStorageState)
+
+  const panelsByTheme = useMemo(() => buildPanelsByTheme(storage), [storage])
 
   const perBreakpoint = panelsByTheme[backgroundAppearanceMode]
 
@@ -90,17 +98,33 @@ export function SculptControlsProvider({ children }: { children: ReactNode }) {
     React.Dispatch<React.SetStateAction<PerBreakpointSculptSettings>>
   >(
     (action) => {
-      setPanelsByTheme((prev) => {
-        const current = prev[backgroundAppearanceMode]
-        const next =
+      setStorage((prev) => {
+        const currentPanel = buildPanelsByTheme(prev)[backgroundAppearanceMode]
+        const nextPanel =
           typeof action === 'function'
-            ? (action as (p: PerBreakpointSculptSettings) => PerBreakpointSculptSettings)(current)
+            ? (action as (p: PerBreakpointSculptSettings) => PerBreakpointSculptSettings)(
+                currentPanel,
+              )
             : action
-        return { ...prev, [backgroundAppearanceMode]: next }
+        const newTransforms = { ...prev.transforms }
+        const newAppearanceRow = { ...prev.appearance[backgroundAppearanceMode] }
+        for (const id of VIEWPORT_BREAKPOINT_ORDER) {
+          newTransforms[id] = extractTransform(nextPanel[id])
+          newAppearanceRow[id] = extractAppearance(nextPanel[id])
+        }
+        return {
+          ...prev,
+          transforms: newTransforms,
+          appearance: {
+            ...prev.appearance,
+            [backgroundAppearanceMode]: newAppearanceRow,
+          },
+        }
       })
     },
     [backgroundAppearanceMode],
   )
+
   const [liveW, setLiveW] = useState(
     () => (typeof window !== 'undefined' ? window.innerWidth : 1024),
   )
@@ -108,11 +132,6 @@ export function SculptControlsProvider({ children }: { children: ReactNode }) {
 
   const liveBreakpoint = useMemo(() => activeViewportBreakpoint(liveW), [liveW])
 
-  /**
-   * Minimal renderer sets `time` as `(Date.now() - oTime) * 0.001` after user uniforms.
-   * Intercepting `gl.uniform1f` is unreliable (`WebGLUniformLocation` may not be `===`).
-   * Freezing `Date.now` while paused keeps that expression constant.
-   */
   useEffect(() => {
     if (!timePaused) {
       Date.now = NATIVE_DATE_NOW
@@ -148,48 +167,127 @@ export function SculptControlsProvider({ children }: { children: ReactNode }) {
     clearRgbRef.current = hexToRgb01(hex)
   }, [sculptPanelOpen, editSliceBg, liveSlice.bgColor])
 
-  const patchEditSlice = useCallback((patch: Partial<SculptVisualSettings>) => {
-    setPerBreakpoint((prev) => ({
-      ...prev,
-      [editBreakpoint]: { ...prev[editBreakpoint], ...patch },
-    }))
-  }, [editBreakpoint])
+  const patchEditSlice = useCallback(
+    (patch: Partial<SculptVisualSettings>) => {
+      setStorage((prev) => {
+        const mode = backgroundAppearanceMode
+        const bp = editBreakpoint
+        let transforms = prev.transforms
+        const { uPosX, uPosY, uPosZ, _scale, ...appearancePatch } = patch
+        if (
+          uPosX !== undefined ||
+          uPosY !== undefined ||
+          uPosZ !== undefined ||
+          _scale !== undefined
+        ) {
+          const cur = prev.transforms[bp]
+          transforms = {
+            ...prev.transforms,
+            [bp]: extractTransform(
+              sanitizeSculptVisualSettings({
+                ...DEFAULT_SCULPT_VISUAL,
+                ...cur,
+                ...(uPosX !== undefined ? { uPosX } : {}),
+                ...(uPosY !== undefined ? { uPosY } : {}),
+                ...(uPosZ !== undefined ? { uPosZ } : {}),
+                ...(_scale !== undefined ? { _scale } : {}),
+              }),
+            ),
+          }
+        }
+        let appearance = prev.appearance
+        if (Object.keys(appearancePatch).length > 0) {
+          const curApp = prev.appearance[mode][bp]
+          const mergedFull = sanitizeSculptVisualSettings({
+            ...mergeVisual(curApp, prev.transforms[bp]),
+            ...appearancePatch,
+          })
+          appearance = {
+            ...prev.appearance,
+            [mode]: {
+              ...prev.appearance[mode],
+              [bp]: extractAppearance(mergedFull),
+            },
+          }
+        }
+        return { ...prev, transforms, appearance }
+      })
+    },
+    [backgroundAppearanceMode, editBreakpoint],
+  )
 
   const patchBreakpointSliceForTheme = useCallback(
-    (
-      mode: BackgroundAppearanceMode,
-      breakpoint: ViewportBreakpointId,
-      patch: Partial<SculptVisualSettings>,
-    ) => {
-      setPanelsByTheme((prev) => ({
-        ...prev,
-        [mode]: {
-          ...prev[mode],
-          [breakpoint]: sanitizeSculptVisualSettings({
-            ...prev[mode][breakpoint],
-            ...patch,
-          }),
-        },
-      }))
+    (mode: BackgroundAppearanceMode, breakpoint: ViewportBreakpointId, patch: Partial<SculptVisualSettings>) => {
+      setStorage((prev) => {
+        const { uPosX, uPosY, uPosZ, _scale, ...appearancePatch } = patch
+        let transforms = prev.transforms
+        if (
+          uPosX !== undefined ||
+          uPosY !== undefined ||
+          uPosZ !== undefined ||
+          _scale !== undefined
+        ) {
+          const cur = prev.transforms[breakpoint]
+          transforms = {
+            ...prev.transforms,
+            [breakpoint]: extractTransform(
+              sanitizeSculptVisualSettings({
+                ...DEFAULT_SCULPT_VISUAL,
+                ...cur,
+                ...(uPosX !== undefined ? { uPosX } : {}),
+                ...(uPosY !== undefined ? { uPosY } : {}),
+                ...(uPosZ !== undefined ? { uPosZ } : {}),
+                ...(_scale !== undefined ? { _scale } : {}),
+              }),
+            ),
+          }
+        }
+        let appearance = prev.appearance
+        if (Object.keys(appearancePatch).length > 0) {
+          const curApp = prev.appearance[mode][breakpoint]
+          const mergedFull = sanitizeSculptVisualSettings({
+            ...mergeVisual(curApp, prev.transforms[breakpoint]),
+            ...appearancePatch,
+          })
+          appearance = {
+            ...prev.appearance,
+            [mode]: {
+              ...prev.appearance[mode],
+              [breakpoint]: extractAppearance(mergedFull),
+            },
+          }
+        }
+        return { ...prev, transforms, appearance }
+      })
     },
     [],
   )
 
   const resetEditSlice = useCallback(() => {
-    const row = sanitizeSculptVisualSettings({
-      ...defaultSculptSliceForTheme(backgroundAppearanceMode),
-      ...(DEFAULT_PER_BREAKPOINT_TRANSFORM_OVERRIDES[editBreakpoint] ?? {}),
+    setStorage((prev) => {
+      const mode = backgroundAppearanceMode
+      const bp = editBreakpoint
+      return {
+        ...prev,
+        transforms: {
+          ...prev.transforms,
+          [bp]: defaultTransformsPerBreakpoint()[bp],
+        },
+        appearance: {
+          ...prev.appearance,
+          [mode]: {
+            ...prev.appearance[mode],
+            [bp]: extractAppearance(defaultSculptSliceForTheme(mode)),
+          },
+        },
+      }
     })
-    setPerBreakpoint((prev) => ({
-      ...prev,
-      [editBreakpoint]: row,
-    }))
-  }, [backgroundAppearanceMode, editBreakpoint, setPerBreakpoint])
+  }, [backgroundAppearanceMode, editBreakpoint])
 
   useEffect(() => {
-    const t = window.setTimeout(() => saveSculptPanelsByTheme(panelsByTheme), 400)
+    const t = window.setTimeout(() => saveSculptStorageState(storage), 400)
     return () => window.clearTimeout(t)
-  }, [panelsByTheme])
+  }, [storage])
 
   const value = useMemo(
     () => ({
@@ -222,6 +320,7 @@ export function SculptControlsProvider({ children }: { children: ReactNode }) {
       patchEditSlice,
       patchBreakpointSliceForTheme,
       resetEditSlice,
+      setPerBreakpoint,
     ],
   )
 

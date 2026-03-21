@@ -13,7 +13,7 @@ vi.mock('@/components/AppShaderDock', () => ({
 function AllProviders({ children }: { children: ReactNode }) {
   return (
     <QueryProvider>
-      <ThemeProvider attribute="class" defaultTheme="dark" enableSystem={false}>
+      <ThemeProvider>
         <MemoryRouter initialEntries={['/']}>{children}</MemoryRouter>
       </ThemeProvider>
     </QueryProvider>

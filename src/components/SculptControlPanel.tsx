@@ -190,9 +190,9 @@ export function SculptControlPanel() {
             <div className="min-w-0 flex-1 space-y-1.5">
               <DrawerTitle>Sculpt &amp; background</DrawerTitle>
               <DrawerDescription className="text-left">
-                Material sliders use the active site theme (
+                Material and background colors use the active site theme (
                 <span className="font-medium text-foreground">{backgroundAppearanceMode}</span>
-                ); background colors below can be set for both dark and light. The canvas uses the
+                ); position and scale are shared (same in light and dark). The canvas uses the
                 preset for your current viewport:{' '}
                 <span className="font-medium text-foreground">{liveBreakpoint}</span>{' '}
                 ({sculptBreakpointLabel(liveBreakpoint)}).

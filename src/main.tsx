@@ -10,7 +10,7 @@ import App from './App.tsx'
 
 createRoot(document.getElementById('root')!).render(
   <QueryProvider>
-    <ThemeProvider attribute="class" defaultTheme="dark" enableSystem disableTransitionOnChange>
+    <ThemeProvider>
       <BrowserRouter
         future={{
           v7_startTransition: true,
