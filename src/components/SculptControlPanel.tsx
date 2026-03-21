@@ -17,7 +17,7 @@ import {
   sculptBreakpointLabel,
   useSculptControls,
 } from '@/context/sculpt-controls-context'
-import { buildSculptClipboardPayload, hexToRgb01 } from '@/lib/sculptControls'
+import { buildSculptClipboardPayload, extractAppearance, hexToRgb01 } from '@/lib/sculptControls'
 import {
   activeViewportBreakpoint,
   VIEWPORT_BREAKPOINT_ORDER,
@@ -100,7 +100,8 @@ export function SculptControlPanel() {
     setEditBreakpoint,
     liveBreakpoint,
     patchEditSlice,
-    patchBreakpointSliceForTheme,
+    patchAppearanceForTheme,
+    perBreakpointTransforms,
     resetEditSlice,
     sculptPanelOpen,
     setSculptPanelOpen,
@@ -109,12 +110,16 @@ export function SculptControlPanel() {
   } = useSculptControls()
 
   const copySettingsJson = () => {
-    const payload = buildSculptClipboardPayload(perBreakpoint, editBreakpoint)
+    const payload = buildSculptClipboardPayload(
+      extractAppearance(perBreakpoint.base),
+      backgroundAppearanceMode,
+      perBreakpointTransforms,
+    )
     const text = JSON.stringify(payload, null, 2)
     void navigator.clipboard.writeText(text).then(
       () =>
         toast.success('Copied sculpt settings', {
-          description: `Appearance from “${editBreakpoint}”; transforms for all breakpoints.`,
+          description: `Material & background for ${backgroundAppearanceMode} theme; transforms for every viewport tier.`,
         }),
       () => toast.error('Could not copy to clipboard'),
     )
@@ -125,7 +130,7 @@ export function SculptControlPanel() {
   const matHex = rgb01ToHex(slice.uMatR, slice.uMatG, slice.uMatB)
 
   const setBgForTheme = (mode: BackgroundAppearanceMode, hex: string) => {
-    patchBreakpointSliceForTheme(mode, editBreakpoint, { bgColor: hex })
+    patchAppearanceForTheme(mode, { bgColor: hex })
   }
 
   return (
@@ -190,16 +195,15 @@ export function SculptControlPanel() {
             <div className="min-w-0 flex-1 space-y-1.5">
               <DrawerTitle>Sculpt &amp; background</DrawerTitle>
               <DrawerDescription className="text-left">
-                Material and background colors use the active site theme (
-                <span className="font-medium text-foreground">{backgroundAppearanceMode}</span>
-                ); position and scale are shared (same in light and dark). The canvas uses the
-                preset for your current viewport:{' '}
-                <span className="font-medium text-foreground">{liveBreakpoint}</span>{' '}
-                ({sculptBreakpointLabel(liveBreakpoint)}).
+                Material and background follow dark vs light only (not viewport size). Position and
+                scale follow the viewport tier you pick below (same numbers in light and dark). Live
+                canvas uses{' '}
+                <span className="font-medium text-foreground">{liveBreakpoint}</span> (
+                {sculptBreakpointLabel(liveBreakpoint)}).
                 {editBreakpoint !== liveBreakpoint && sculptPanelOpen ? (
                   <span className="mt-1 block text-amber-600 dark:text-amber-400">
-                    You are editing {editBreakpoint} — changes apply when the viewport matches that
-                    tier.
+                    You are editing transform preset {editBreakpoint} — it applies when the viewport
+                    matches that tier.
                   </span>
                 ) : null}
               </DrawerDescription>
@@ -219,29 +223,6 @@ export function SculptControlPanel() {
         </DrawerHeader>
 
         <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-4 py-4 sm:px-5">
-          <div className="mb-6">
-            <p className="mb-2 text-xs font-medium uppercase tracking-wide text-muted-foreground">
-              Edit preset for
-            </p>
-            <div className="flex flex-wrap gap-1.5">
-              {VIEWPORT_BREAKPOINT_ORDER.map((id) => (
-                <Button
-                  key={id}
-                  type="button"
-                  size="sm"
-                  variant={editBreakpoint === id ? 'default' : 'outline'}
-                  className="text-xs"
-                  onClick={() => setEditBreakpoint(id)}
-                >
-                  {id}
-                  <span className="ml-1 hidden text-[0.65rem] opacity-70 lg:inline">
-                    {sculptBreakpointLabel(id)}
-                  </span>
-                </Button>
-              ))}
-            </div>
-          </div>
-
           <div className="grid gap-8 lg:grid-cols-2 lg:gap-10">
             <section className="grid gap-4">
               <h3 className="text-sm font-semibold">Material &amp; color</h3>
@@ -331,59 +312,80 @@ export function SculptControlPanel() {
             </section>
 
             <section className="grid gap-4">
-              <h3 className="text-sm font-semibold">Transform</h3>
-              <RangeRow
-                label="Scale"
-                min={0.25}
-                max={2.5}
-                step={0.01}
-                value={slice._scale}
-                onChange={(_scale) => patchEditSlice({ _scale })}
-              />
-              <RangeRow
-                label="Position X"
-                min={-0.85}
-                max={0.85}
-                step={0.005}
-                value={slice.uPosX}
-                onChange={(uPosX) => patchEditSlice({ uPosX })}
-              />
-              <RangeRow
-                label="Position Y"
-                min={-0.85}
-                max={0.85}
-                step={0.005}
-                value={slice.uPosY}
-                onChange={(uPosY) => patchEditSlice({ uPosY })}
-              />
-              <RangeRow
-                label="Position Z"
-                min={-0.85}
-                max={0.85}
-                step={0.005}
-                value={slice.uPosZ}
-                onChange={(uPosZ) => patchEditSlice({ uPosZ })}
-              />
-            </section>
-
-            <section className="grid gap-4 lg:col-span-2">
               <h3 className="text-sm font-semibold">Background</h3>
               <p className="text-xs text-muted-foreground">
-                Per breakpoint tab above: each color drives WebGL clear (ray misses) and the CSS
-                plate for that appearance. With the panel open, clear color previews the active
-                theme’s preset for the tab you are editing.
+                One color per site theme for WebGL clear (ray misses) and the CSS plate. Not tied to
+                viewport tier.
               </p>
               <ColorRow
                 label="Color (dark mode)"
-                value={panelsByTheme.dark[editBreakpoint].bgColor}
+                value={panelsByTheme.dark.base.bgColor}
                 onChange={(hex) => setBgForTheme('dark', hex)}
               />
               <ColorRow
                 label="Color (light mode)"
-                value={panelsByTheme.light[editBreakpoint].bgColor}
+                value={panelsByTheme.light.base.bgColor}
                 onChange={(hex) => setBgForTheme('light', hex)}
               />
             </section>
+
+            <div className="lg:col-span-2">
+              <p className="mb-2 text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                Transform preset (viewport tier)
+              </p>
+              <div className="mb-6 flex flex-wrap gap-1.5">
+                {VIEWPORT_BREAKPOINT_ORDER.map((id) => (
+                  <Button
+                    key={id}
+                    type="button"
+                    size="sm"
+                    variant={editBreakpoint === id ? 'default' : 'outline'}
+                    className="text-xs"
+                    onClick={() => setEditBreakpoint(id)}
+                  >
+                    {id}
+                    <span className="ml-1 hidden text-[0.65rem] opacity-70 lg:inline">
+                      {sculptBreakpointLabel(id)}
+                    </span>
+                  </Button>
+                ))}
+              </div>
+              <section className="grid max-w-xl gap-4">
+                <h3 className="text-sm font-semibold">Position &amp; scale</h3>
+                <RangeRow
+                  label="Scale"
+                  min={0.25}
+                  max={2.5}
+                  step={0.01}
+                  value={slice._scale}
+                  onChange={(_scale) => patchEditSlice({ _scale })}
+                />
+                <RangeRow
+                  label="Position X"
+                  min={-0.85}
+                  max={0.85}
+                  step={0.005}
+                  value={slice.uPosX}
+                  onChange={(uPosX) => patchEditSlice({ uPosX })}
+                />
+                <RangeRow
+                  label="Position Y"
+                  min={-0.85}
+                  max={0.85}
+                  step={0.005}
+                  value={slice.uPosY}
+                  onChange={(uPosY) => patchEditSlice({ uPosY })}
+                />
+                <RangeRow
+                  label="Position Z"
+                  min={-0.85}
+                  max={0.85}
+                  step={0.005}
+                  value={slice.uPosZ}
+                  onChange={(uPosZ) => patchEditSlice({ uPosZ })}
+                />
+              </section>
+            </div>
           </div>
         </div>
 
@@ -393,7 +395,7 @@ export function SculptControlPanel() {
             Copy settings
           </Button>
           <Button type="button" variant="outline" size="sm" onClick={resetEditSlice}>
-            Reset {editBreakpoint} to defaults
+            Reset {editBreakpoint} transform
           </Button>
         </div>
         </div>

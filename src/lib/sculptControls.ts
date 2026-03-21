@@ -73,14 +73,18 @@ export type SculptAppearanceOnly = Omit<
   'uPosX' | 'uPosY' | 'uPosZ' | '_scale'
 >
 
+/** @deprecated v3 only — appearance was duplicated per breakpoint */
 export type PerBreakpointAppearanceByTheme = Record<
   BackgroundAppearanceMode,
   Record<ViewportBreakpointId, SculptAppearanceOnly>
 >
 
+/** Material / grade / bg per site theme only (not per viewport tier). */
+export type AppearanceByTheme = Record<BackgroundAppearanceMode, SculptAppearanceOnly>
+
 export type SculptStorageState = {
   transforms: PerBreakpointPositionScale
-  appearance: PerBreakpointAppearanceByTheme
+  appearance: AppearanceByTheme
 }
 
 export function extractTransform(s: SculptVisualSettings): SculptPositionScaleSlice {
@@ -99,13 +103,33 @@ export function mergeVisual(
   return sanitizeSculptVisualSettings({ ...appearance, ...t })
 }
 
-export function buildPerBreakpointFromParts(
-  appearanceRow: Record<ViewportBreakpointId, SculptAppearanceOnly>,
+const NEUTRAL_TRANSFORM: SculptPositionScaleSlice = {
+  uPosX: 0,
+  uPosY: 0,
+  uPosZ: 0,
+  _scale: 1,
+}
+
+/** Merge partial sculpt fields into theme appearance (ignores position/scale in patch). */
+export function patchAppearanceOnlyFields(
+  current: SculptAppearanceOnly,
+  patch: Partial<SculptVisualSettings>,
+): SculptAppearanceOnly {
+  const full = sanitizeSculptVisualSettings({
+    ...mergeVisual(current, NEUTRAL_TRANSFORM),
+    ...patch,
+  })
+  return extractAppearance(full)
+}
+
+/** One theme: same material/bg for every tier; transforms differ per tier. */
+export function buildPerBreakpointForTheme(
+  appearance: SculptAppearanceOnly,
   transforms: PerBreakpointPositionScale,
 ): PerBreakpointSculptSettings {
   const row = {} as PerBreakpointSculptSettings
   for (const id of VIEWPORT_BREAKPOINT_ORDER) {
-    row[id] = mergeVisual(appearanceRow[id], transforms[id])
+    row[id] = mergeVisual(appearance, transforms[id])
   }
   return row
 }
@@ -128,54 +152,43 @@ export type SculptAppearanceClipboardSlice = Pick<
   | 'bgColor'
 >
 
-export const SCULPT_CLIPBOARD_VERSION = 3 as const
+export const SCULPT_CLIPBOARD_VERSION = 4 as const
 
 export type SculptClipboardPayload = {
   version: typeof SCULPT_CLIPBOARD_VERSION
-  /** Which preset tab the `appearance` fields were taken from (when copying from the panel). */
-  appearanceFromBreakpoint: ViewportBreakpointId
+  /** Which site theme the `appearance` block describes. */
+  appearanceMode: BackgroundAppearanceMode
   appearance: SculptAppearanceClipboardSlice
   perBreakpoint: PerBreakpointPositionScale
 }
 
 /**
- * Clipboard JSON: one shared material + background (from `appearanceFromBreakpoint`), and
- * position + scale for every breakpoint.
+ * Clipboard JSON: material + background for one theme; transforms for every breakpoint.
  */
 export function buildSculptClipboardPayload(
-  per: PerBreakpointSculptSettings,
-  appearanceFromBreakpoint: ViewportBreakpointId,
+  appearance: SculptAppearanceOnly,
+  appearanceMode: BackgroundAppearanceMode,
+  transforms: PerBreakpointPositionScale,
 ): SculptClipboardPayload {
-  const src = per[appearanceFromBreakpoint]
-  const perBreakpoint = {} as PerBreakpointPositionScale
-  for (const id of VIEWPORT_BREAKPOINT_ORDER) {
-    const s = per[id]
-    perBreakpoint[id] = {
-      uPosX: s.uPosX,
-      uPosY: s.uPosY,
-      uPosZ: s.uPosZ,
-      _scale: s._scale,
-    }
-  }
   return {
     version: SCULPT_CLIPBOARD_VERSION,
-    appearanceFromBreakpoint,
+    appearanceMode,
     appearance: {
-      uMatR: src.uMatR,
-      uMatG: src.uMatG,
-      uMatB: src.uMatB,
-      uHueShift: src.uHueShift,
-      uSat: src.uSat,
-      uValue: src.uValue,
-      uContrast: src.uContrast,
-      uAmbient: src.uAmbient,
-      uRim: src.uRim,
-      uMetal: src.uMetal,
-      uShine: src.uShine,
-      uBallMetal: src.uBallMetal,
-      bgColor: src.bgColor,
+      uMatR: appearance.uMatR,
+      uMatG: appearance.uMatG,
+      uMatB: appearance.uMatB,
+      uHueShift: appearance.uHueShift,
+      uSat: appearance.uSat,
+      uValue: appearance.uValue,
+      uContrast: appearance.uContrast,
+      uAmbient: appearance.uAmbient,
+      uRim: appearance.uRim,
+      uMetal: appearance.uMetal,
+      uShine: appearance.uShine,
+      uBallMetal: appearance.uBallMetal,
+      bgColor: appearance.bgColor,
     },
-    perBreakpoint,
+    perBreakpoint: { ...transforms },
   }
 }
 
@@ -206,25 +219,34 @@ export function defaultTransformsPerBreakpoint(): PerBreakpointPositionScale {
   return row
 }
 
-export function defaultAppearancePerTheme(
-  mode: BackgroundAppearanceMode,
-): Record<ViewportBreakpointId, SculptAppearanceOnly> {
-  const d = defaultPerBreakpointForTheme(mode)
-  const r = {} as Record<ViewportBreakpointId, SculptAppearanceOnly>
-  for (const id of VIEWPORT_BREAKPOINT_ORDER) {
-    r[id] = extractAppearance(d[id])
-  }
-  return r
+export function defaultAppearanceOnlyForTheme(mode: BackgroundAppearanceMode): SculptAppearanceOnly {
+  return extractAppearance(defaultSculptSliceForTheme(mode))
 }
 
 export function defaultSculptStorageState(): SculptStorageState {
   return {
     transforms: defaultTransformsPerBreakpoint(),
     appearance: {
-      dark: defaultAppearancePerTheme('dark'),
-      light: defaultAppearancePerTheme('light'),
+      dark: defaultAppearanceOnlyForTheme('dark'),
+      light: defaultAppearanceOnlyForTheme('light'),
     },
   }
+}
+
+function pickAppearanceFromLegacyBreakpointRow(
+  row: Record<ViewportBreakpointId, SculptAppearanceOnly>,
+  mode: BackgroundAppearanceMode,
+): SculptAppearanceOnly {
+  const pick =
+    row.base ??
+    row.sm ??
+    VIEWPORT_BREAKPOINT_ORDER.map((id) => row[id]).find((x) => x != null)
+  return pick ?? defaultAppearanceOnlyForTheme(mode)
+}
+
+type LegacyV3StorageState = {
+  transforms: PerBreakpointPositionScale
+  appearance: PerBreakpointAppearanceByTheme
 }
 
 function migrateV2PanelsToStorageState(panels: SculptPanelsByTheme): SculptStorageState {
@@ -232,18 +254,22 @@ function migrateV2PanelsToStorageState(panels: SculptPanelsByTheme): SculptStora
   for (const id of VIEWPORT_BREAKPOINT_ORDER) {
     transforms[id] = extractTransform(panels.dark[id])
   }
-  const appearance: PerBreakpointAppearanceByTheme = {
-    dark: {} as Record<ViewportBreakpointId, SculptAppearanceOnly>,
-    light: {} as Record<ViewportBreakpointId, SculptAppearanceOnly>,
-  }
+  const darkRow = {} as Record<ViewportBreakpointId, SculptAppearanceOnly>
+  const lightRow = {} as Record<ViewportBreakpointId, SculptAppearanceOnly>
   for (const id of VIEWPORT_BREAKPOINT_ORDER) {
-    appearance.dark[id] = extractAppearance(panels.dark[id])
-    appearance.light[id] = extractAppearance(panels.light[id])
+    darkRow[id] = extractAppearance(panels.dark[id])
+    lightRow[id] = extractAppearance(panels.light[id])
   }
-  return { transforms, appearance }
+  return {
+    transforms,
+    appearance: {
+      dark: pickAppearanceFromLegacyBreakpointRow(darkRow, 'dark'),
+      light: pickAppearanceFromLegacyBreakpointRow(lightRow, 'light'),
+    },
+  }
 }
 
-function hydrateStorageStateV3(raw: unknown): SculptStorageState | null {
+function hydrateLegacyV3Shape(raw: unknown): LegacyV3StorageState | null {
   if (!raw || typeof raw !== 'object') return null
   const p = raw as { version?: unknown; transforms?: unknown; appearance?: unknown }
   if (p.version !== 3) return null
@@ -265,8 +291,12 @@ function hydrateStorageStateV3(raw: unknown): SculptStorageState | null {
     }
   }
   const appearance: PerBreakpointAppearanceByTheme = {
-    dark: { ...defaults.appearance.dark },
-    light: { ...defaults.appearance.light },
+    dark: {} as Record<ViewportBreakpointId, SculptAppearanceOnly>,
+    light: {} as Record<ViewportBreakpointId, SculptAppearanceOnly>,
+  }
+  for (const id of VIEWPORT_BREAKPOINT_ORDER) {
+    appearance.dark[id] = { ...defaultAppearanceOnlyForTheme('dark') }
+    appearance.light[id] = { ...defaultAppearanceOnlyForTheme('light') }
   }
   if (p.appearance && typeof p.appearance === 'object') {
     const a = p.appearance as {
@@ -292,10 +322,60 @@ function hydrateStorageStateV3(raw: unknown): SculptStorageState | null {
   return { transforms, appearance }
 }
 
+function migrateLegacyV3ToV4(legacy: LegacyV3StorageState): SculptStorageState {
+  return {
+    transforms: legacy.transforms,
+    appearance: {
+      dark: pickAppearanceFromLegacyBreakpointRow(legacy.appearance.dark, 'dark'),
+      light: pickAppearanceFromLegacyBreakpointRow(legacy.appearance.light, 'light'),
+    },
+  }
+}
+
+function hydrateStorageStateV4(raw: unknown): SculptStorageState | null {
+  if (!raw || typeof raw !== 'object') return null
+  const p = raw as { version?: unknown; transforms?: unknown; appearance?: unknown }
+  if (p.version !== 4) return null
+  const defaults = defaultSculptStorageState()
+  const transforms = { ...defaults.transforms }
+  if (p.transforms && typeof p.transforms === 'object') {
+    const tObj = p.transforms as Record<string, unknown>
+    for (const id of VIEWPORT_BREAKPOINT_ORDER) {
+      const s = tObj[id]
+      if (s && typeof s === 'object') {
+        transforms[id] = extractTransform(
+          sanitizeSculptVisualSettings({
+            ...DEFAULT_SCULPT_VISUAL,
+            ...transforms[id],
+            ...(s as Record<string, unknown>),
+          }),
+        )
+      }
+    }
+  }
+  const appearance: AppearanceByTheme = {
+    dark: { ...defaults.appearance.dark },
+    light: { ...defaults.appearance.light },
+  }
+  if (p.appearance && typeof p.appearance === 'object') {
+    const a = p.appearance as { dark?: unknown; light?: unknown }
+    for (const mode of ['dark', 'light'] as const) {
+      const side = a[mode]
+      if (side && typeof side === 'object') {
+        appearance[mode] = patchAppearanceOnlyFields(
+          defaults.appearance[mode],
+          side as Partial<SculptVisualSettings>,
+        )
+      }
+    }
+  }
+  return { transforms, appearance }
+}
+
 export function buildPanelsByTheme(state: SculptStorageState): SculptPanelsByTheme {
   return {
-    dark: buildPerBreakpointFromParts(state.appearance.dark, state.transforms),
-    light: buildPerBreakpointFromParts(state.appearance.light, state.transforms),
+    dark: buildPerBreakpointForTheme(state.appearance.dark, state.transforms),
+    light: buildPerBreakpointForTheme(state.appearance.light, state.transforms),
   }
 }
 
@@ -304,8 +384,23 @@ export function loadSculptStorageState(): SculptStorageState {
     const v3raw = localStorage.getItem(STORAGE_KEY_V3)
     if (v3raw) {
       const parsed = JSON.parse(v3raw) as unknown
-      const h = hydrateStorageStateV3(parsed)
-      if (h) return h
+      const ver = (parsed as { version?: unknown }).version
+      if (ver === 4) {
+        const h = hydrateStorageStateV4(parsed)
+        if (h) return h
+      }
+      if (ver === 3) {
+        const legacy = hydrateLegacyV3Shape(parsed)
+        if (legacy) {
+          const v4 = migrateLegacyV3ToV4(legacy)
+          try {
+            saveSculptStorageState(v4)
+          } catch {
+            /* ignore */
+          }
+          return v4
+        }
+      }
     }
     const v2raw = localStorage.getItem(STORAGE_KEY_V2)
     if (v2raw) {
@@ -350,7 +445,7 @@ export function saveSculptStorageState(state: SculptStorageState) {
   try {
     localStorage.setItem(
       STORAGE_KEY_V3,
-      JSON.stringify({ version: 3, transforms: state.transforms, appearance: state.appearance }),
+      JSON.stringify({ version: 4, transforms: state.transforms, appearance: state.appearance }),
     )
   } catch {
     /* ignore quota */
