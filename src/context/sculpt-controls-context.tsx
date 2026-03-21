@@ -9,17 +9,20 @@ import {
   type MutableRefObject,
   type ReactNode,
 } from 'react'
+import type { BackgroundAppearanceMode } from '@/config/backgroundTheme'
 import {
   DEFAULT_SCULPT_VISUAL,
-  defaultPerBreakpointSettings,
+  defaultSculptSliceForTheme,
   hexToRgb01,
-  loadPerBreakpointSettings,
+  loadSculptPanelsByTheme,
   sanitizeSculptVisualSettings,
-  savePerBreakpointSettings,
+  saveSculptPanelsByTheme,
   toUniformSnapshot,
   type PerBreakpointSculptSettings,
+  type SculptPanelsByTheme,
   type SculptVisualSettings,
 } from '@/lib/sculptControls'
+import { useTheme } from 'next-themes'
 import {
   activeViewportBreakpoint,
   breakpointMinWidth,
@@ -34,6 +37,8 @@ type SculptControlsContextValue = {
   uniformsRef: MutableRefObject<ReturnType<typeof toUniformSnapshot>>
   /** WebGL clear RGB (sRGB 0–1); read each frame by ShaderParkBackground patches. */
   clearRgbRef: MutableRefObject<{ r: number; g: number; b: number }>
+  /** Derived from site theme (`next-themes`). Separate sculpt presets per mode. */
+  backgroundAppearanceMode: BackgroundAppearanceMode
   /** Same as `timePaused`; for listeners that must read latest without effect deps. */
   timePausedRef: MutableRefObject<boolean>
   timePaused: boolean
@@ -58,15 +63,35 @@ export function useSculptControls() {
 }
 
 export function SculptControlsProvider({ children }: { children: ReactNode }) {
+  const { resolvedTheme } = useTheme()
+  const backgroundAppearanceMode: BackgroundAppearanceMode =
+    resolvedTheme === 'light' ? 'light' : 'dark'
+
   const uniformsRef = useRef(toUniformSnapshot(DEFAULT_SCULPT_VISUAL))
   const clearRgbRef = useRef(hexToRgb01(DEFAULT_SCULPT_VISUAL.bgColor))
   const [timePaused, setTimePaused] = useState(false)
   const timePausedRef = useRef(timePaused)
   timePausedRef.current = timePaused
   const [sculptPanelOpen, setSculptPanelOpen] = useState(false)
-  const [perBreakpoint, setPerBreakpoint] = useState<PerBreakpointSculptSettings>(() => {
-    return loadPerBreakpointSettings() ?? defaultPerBreakpointSettings()
-  })
+  const [panelsByTheme, setPanelsByTheme] = useState<SculptPanelsByTheme>(loadSculptPanelsByTheme)
+
+  const perBreakpoint = panelsByTheme[backgroundAppearanceMode]
+
+  const setPerBreakpoint = useCallback<
+    React.Dispatch<React.SetStateAction<PerBreakpointSculptSettings>>
+  >(
+    (action) => {
+      setPanelsByTheme((prev) => {
+        const current = prev[backgroundAppearanceMode]
+        const next =
+          typeof action === 'function'
+            ? (action as (p: PerBreakpointSculptSettings) => PerBreakpointSculptSettings)(current)
+            : action
+        return { ...prev, [backgroundAppearanceMode]: next }
+      })
+    },
+    [backgroundAppearanceMode],
+  )
   const [liveW, setLiveW] = useState(
     () => (typeof window !== 'undefined' ? window.innerWidth : 1024),
   )
@@ -122,21 +147,23 @@ export function SculptControlsProvider({ children }: { children: ReactNode }) {
   }, [editBreakpoint])
 
   const resetEditSlice = useCallback(() => {
+    const row = defaultSculptSliceForTheme(backgroundAppearanceMode)
     setPerBreakpoint((prev) => ({
       ...prev,
-      [editBreakpoint]: { ...DEFAULT_SCULPT_VISUAL },
+      [editBreakpoint]: row,
     }))
-  }, [editBreakpoint])
+  }, [backgroundAppearanceMode, editBreakpoint, setPerBreakpoint])
 
   useEffect(() => {
-    const t = window.setTimeout(() => savePerBreakpointSettings(perBreakpoint), 400)
+    const t = window.setTimeout(() => saveSculptPanelsByTheme(panelsByTheme), 400)
     return () => window.clearTimeout(t)
-  }, [perBreakpoint])
+  }, [panelsByTheme])
 
   const value = useMemo(
     () => ({
       uniformsRef,
       clearRgbRef,
+      backgroundAppearanceMode,
       timePausedRef,
       timePaused,
       setTimePaused,
@@ -151,6 +178,7 @@ export function SculptControlsProvider({ children }: { children: ReactNode }) {
       resetEditSlice,
     }),
     [
+      backgroundAppearanceMode,
       perBreakpoint,
       editBreakpoint,
       liveBreakpoint,

@@ -1,4 +1,5 @@
-import { Copy, Pause, Play, SlidersHorizontal, X } from 'lucide-react'
+import { Copy, Moon, Pause, Play, SlidersHorizontal, Sun, X } from 'lucide-react'
+import { useTheme } from 'next-themes'
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
 import {
@@ -89,7 +90,9 @@ function ColorRow({
 }
 
 export function SculptControlPanel() {
+  const { setTheme } = useTheme()
   const {
+    backgroundAppearanceMode,
     perBreakpoint,
     editBreakpoint,
     setEditBreakpoint,
@@ -151,6 +154,27 @@ export function SculptControlPanel() {
           {timePaused ? <Play className="size-4" /> : <Pause className="size-4" />}
           <span className="hidden sm:inline">{timePaused ? 'Play' : 'Pause'}</span>
         </Button>
+        <Button
+          type="button"
+          size="sm"
+          variant="secondary"
+          className="shadow-md"
+          aria-label={
+            backgroundAppearanceMode === 'light'
+              ? 'Switch to dark theme'
+              : 'Switch to light theme'
+          }
+          onClick={() => setTheme(backgroundAppearanceMode === 'light' ? 'dark' : 'light')}
+        >
+          {backgroundAppearanceMode === 'light' ? (
+            <Moon className="size-4" />
+          ) : (
+            <Sun className="size-4" />
+          )}
+          <span className="hidden sm:inline">
+            {backgroundAppearanceMode === 'light' ? 'Dark' : 'Light'}
+          </span>
+        </Button>
       </div>
       <DrawerContent side="right" className="gap-0 p-0">
         <div data-vaul-no-drag className="flex h-full min-h-0 flex-1 flex-col">
@@ -159,8 +183,10 @@ export function SculptControlPanel() {
             <div className="min-w-0 flex-1 space-y-1.5">
               <DrawerTitle>Sculpt &amp; background</DrawerTitle>
               <DrawerDescription className="text-left">
-                Values are saved per Tailwind breakpoint (min-width). The canvas uses the preset
-                for your current viewport:{' '}
+                Values are saved per Tailwind breakpoint (min-width) and per site appearance (
+                <span className="font-medium text-foreground">{backgroundAppearanceMode}</span>
+                ). Switch light/dark theme to edit the other set. The canvas uses the preset for
+                your current viewport:{' '}
                 <span className="font-medium text-foreground">{liveBreakpoint}</span>{' '}
                 ({sculptBreakpointLabel(liveBreakpoint)}).
                 {editBreakpoint !== liveBreakpoint && sculptPanelOpen ? (

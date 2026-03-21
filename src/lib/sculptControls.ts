@@ -1,3 +1,7 @@
+import {
+  BACKGROUND_THEME_SEED,
+  type BackgroundAppearanceMode,
+} from '@/config/backgroundTheme'
 import type { ViewportBreakpointId } from '@/lib/viewportBreakpoint'
 import { VIEWPORT_BREAKPOINT_ORDER } from '@/lib/viewportBreakpoint'
 
@@ -126,14 +130,113 @@ export function buildSculptClipboardPayload(
 }
 
 export function defaultPerBreakpointSettings(): PerBreakpointSculptSettings {
+  return defaultPerBreakpointForTheme('dark')
+}
+
+export type SculptPanelsByTheme = Record<BackgroundAppearanceMode, PerBreakpointSculptSettings>
+
+const STORAGE_KEY_LEGACY = 'shader-park-sculpt-panel-v1'
+const STORAGE_KEY_V2 = 'shader-park-sculpt-panel-v2'
+
+/** One breakpoint row: defaults + appearance seed (dark vs light plate). */
+export function defaultSculptSliceForTheme(
+  mode: BackgroundAppearanceMode,
+): SculptVisualSettings {
+  return sanitizeSculptVisualSettings({
+    ...DEFAULT_SCULPT_VISUAL,
+    ...BACKGROUND_THEME_SEED[mode],
+  })
+}
+
+export function defaultPerBreakpointForTheme(
+  mode: BackgroundAppearanceMode,
+): PerBreakpointSculptSettings {
+  const seed = defaultSculptSliceForTheme(mode)
   const row = {} as PerBreakpointSculptSettings
   for (const id of VIEWPORT_BREAKPOINT_ORDER) {
-    row[id] = { ...DEFAULT_SCULPT_VISUAL }
+    row[id] = { ...seed }
   }
   return row
 }
 
-const STORAGE_KEY = 'shader-park-sculpt-panel-v1'
+function migrateLegacyV1ToDarkPanel(
+  parsed: Partial<PerBreakpointSculptSettings>,
+): PerBreakpointSculptSettings {
+  const base = defaultPerBreakpointForTheme('dark')
+  for (const id of VIEWPORT_BREAKPOINT_ORDER) {
+    const slice = parsed[id]
+    if (slice && typeof slice === 'object') {
+      base[id] = sanitizeSculptVisualSettings({
+        ...DEFAULT_SCULPT_VISUAL,
+        ...BACKGROUND_THEME_SEED.dark,
+        ...slice,
+      })
+    }
+  }
+  return base
+}
+
+function hydrateThemePanel(
+  raw: unknown,
+  mode: BackgroundAppearanceMode,
+): PerBreakpointSculptSettings {
+  const base = defaultPerBreakpointForTheme(mode)
+  if (!raw || typeof raw !== 'object') return base
+  const o = raw as Partial<PerBreakpointSculptSettings>
+  for (const id of VIEWPORT_BREAKPOINT_ORDER) {
+    const slice = o[id]
+    if (slice && typeof slice === 'object') {
+      base[id] = sanitizeSculptVisualSettings({
+        ...DEFAULT_SCULPT_VISUAL,
+        ...BACKGROUND_THEME_SEED[mode],
+        ...slice,
+      })
+    }
+  }
+  return base
+}
+
+export function loadSculptPanelsByTheme(): SculptPanelsByTheme {
+  try {
+    const v2raw = localStorage.getItem(STORAGE_KEY_V2)
+    if (v2raw) {
+      const parsed = JSON.parse(v2raw) as { dark?: unknown; light?: unknown }
+      return {
+        dark: hydrateThemePanel(parsed.dark, 'dark'),
+        light: hydrateThemePanel(parsed.light, 'light'),
+      }
+    }
+    const v1raw = localStorage.getItem(STORAGE_KEY_LEGACY)
+    if (v1raw) {
+      const parsed = JSON.parse(v1raw) as Partial<PerBreakpointSculptSettings>
+      const out: SculptPanelsByTheme = {
+        dark: migrateLegacyV1ToDarkPanel(parsed),
+        light: defaultPerBreakpointForTheme('light'),
+      }
+      try {
+        localStorage.setItem(STORAGE_KEY_V2, JSON.stringify(out))
+        localStorage.removeItem(STORAGE_KEY_LEGACY)
+      } catch {
+        /* ignore */
+      }
+      return out
+    }
+  } catch {
+    /* ignore */
+  }
+  return {
+    dark: defaultPerBreakpointForTheme('dark'),
+    light: defaultPerBreakpointForTheme('light'),
+  }
+}
+
+export function saveSculptPanelsByTheme(data: SculptPanelsByTheme) {
+  try {
+    localStorage.setItem(STORAGE_KEY_V2, JSON.stringify(data))
+  } catch {
+    /* ignore quota */
+  }
+}
 
 const HEX6 = /^#[0-9a-fA-F]{6}$/
 
@@ -212,32 +315,6 @@ export function sanitizeUniformSnapshot(u: SculptUniformSnapshot): SculptUniform
   return toUniformSnapshot(
     sanitizeSculptVisualSettings({ ...DEFAULT_SCULPT_VISUAL, ...u }),
   )
-}
-
-export function loadPerBreakpointSettings(): PerBreakpointSculptSettings | null {
-  try {
-    const raw = localStorage.getItem(STORAGE_KEY)
-    if (!raw) return null
-    const parsed = JSON.parse(raw) as Partial<PerBreakpointSculptSettings>
-    const base = defaultPerBreakpointSettings()
-    for (const id of VIEWPORT_BREAKPOINT_ORDER) {
-      const slice = parsed[id]
-      if (slice && typeof slice === 'object') {
-        base[id] = sanitizeSculptVisualSettings({ ...DEFAULT_SCULPT_VISUAL, ...slice })
-      }
-    }
-    return base
-  } catch {
-    return null
-  }
-}
-
-export function savePerBreakpointSettings(data: PerBreakpointSculptSettings) {
-  try {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(data))
-  } catch {
-    /* ignore quota */
-  }
 }
 
 export function toUniformSnapshot(v: SculptVisualSettings): SculptUniformSnapshot {
