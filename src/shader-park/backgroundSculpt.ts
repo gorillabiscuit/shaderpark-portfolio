@@ -12,8 +12,8 @@ export const backgroundSculptSource = `
 setGeometryQuality(88);
 setMaxIterations(420);
 
-var uMatR = input(0.796078431372549, 0, 1);
-var uMatG = input(1, 0, 1);
+var uMatR = input(0.6235294117647059, 0, 1);
+var uMatG = input(0.9411764705882353, 0, 1);
 var uMatB = input(0.058823529411764705, 0, 1);
 
 var uHueShift = input(0.025, -1, 1);

@@ -6,7 +6,7 @@ import type { SculptVisualSettings } from '@/lib/sculptControls'
  */
 export type BackgroundAppearanceMode = 'dark' | 'light'
 
-export const DARK_BACKGROUND_BG = '#0e0e12'
+export const DARK_BACKGROUND_BG = '#0e1629'
 export const LIGHT_BACKGROUND_BG = '#d4d4d4'
 
 /** Partial overrides per appearance (plate color; material lives in `DEFAULT_SCULPT_VISUAL`). */

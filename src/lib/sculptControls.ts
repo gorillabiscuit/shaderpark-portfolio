@@ -31,8 +31,8 @@ export type SculptVisualSettings = SculptUniformSnapshot & {
 }
 
 export const DEFAULT_SCULPT_VISUAL: SculptVisualSettings = {
-  uMatR: 0.796078431372549,
-  uMatG: 1,
+  uMatR: 0.6235294117647059,
+  uMatG: 0.9411764705882353,
   uMatB: 0.058823529411764705,
   uHueShift: 0.025,
   uSat: 1.37,
@@ -47,7 +47,7 @@ export const DEFAULT_SCULPT_VISUAL: SculptVisualSettings = {
   uPosY: 0,
   uPosZ: 0,
   _scale: 1,
-  bgColor: '#0e0e12',
+  bgColor: '#0e1629',
 }
 
 /** Author default transforms per viewport tier (merged on top of theme slice). */
