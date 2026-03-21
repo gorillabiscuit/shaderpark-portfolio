@@ -6,6 +6,12 @@ export type SculptUniformSnapshot = {
   uMatR: number
   uMatG: number
   uMatB: number
+  uHueShift: number
+  uSat: number
+  uValue: number
+  uContrast: number
+  uAmbient: number
+  uRim: number
   uMetal: number
   uShine: number
   uBallMetal: number
@@ -24,6 +30,12 @@ export const DEFAULT_SCULPT_VISUAL: SculptVisualSettings = {
   uMatR: 201 / 255,
   uMatG: 240 / 255,
   uMatB: 16 / 255,
+  uHueShift: 0,
+  uSat: 1,
+  uValue: 1,
+  uContrast: 1,
+  uAmbient: 0,
+  uRim: 0,
   uMetal: 0.52,
   uShine: 0.38,
   uBallMetal: 0.78,
@@ -47,10 +59,22 @@ export type PerBreakpointPositionScale = Record<ViewportBreakpointId, SculptPosi
 /** Single global look in clipboard (not repeated under each breakpoint). */
 export type SculptAppearanceClipboardSlice = Pick<
   SculptVisualSettings,
-  'uMatR' | 'uMatG' | 'uMatB' | 'uMetal' | 'uShine' | 'uBallMetal' | 'bgColor'
+  | 'uMatR'
+  | 'uMatG'
+  | 'uMatB'
+  | 'uHueShift'
+  | 'uSat'
+  | 'uValue'
+  | 'uContrast'
+  | 'uAmbient'
+  | 'uRim'
+  | 'uMetal'
+  | 'uShine'
+  | 'uBallMetal'
+  | 'bgColor'
 >
 
-export const SCULPT_CLIPBOARD_VERSION = 2 as const
+export const SCULPT_CLIPBOARD_VERSION = 3 as const
 
 export type SculptClipboardPayload = {
   version: typeof SCULPT_CLIPBOARD_VERSION
@@ -86,6 +110,12 @@ export function buildSculptClipboardPayload(
       uMatR: src.uMatR,
       uMatG: src.uMatG,
       uMatB: src.uMatB,
+      uHueShift: src.uHueShift,
+      uSat: src.uSat,
+      uValue: src.uValue,
+      uContrast: src.uContrast,
+      uAmbient: src.uAmbient,
+      uRim: src.uRim,
       uMetal: src.uMetal,
       uShine: src.uShine,
       uBallMetal: src.uBallMetal,
@@ -158,6 +188,12 @@ export function sanitizeSculptVisualSettings(
     uMatR,
     uMatG,
     uMatB,
+    uHueShift: num(input.uHueShift, -1, 1, d.uHueShift),
+    uSat: num(input.uSat, 0, 2, d.uSat),
+    uValue: num(input.uValue, 0, 2, d.uValue),
+    uContrast: num(input.uContrast, 0.35, 2.2, d.uContrast),
+    uAmbient: num(input.uAmbient, 0, 0.35, d.uAmbient),
+    uRim: num(input.uRim, 0, 1, d.uRim),
     uMetal: num(input.uMetal, 0, 1, d.uMetal),
     uShine: num(input.uShine, 0, 1, d.uShine),
     uBallMetal: num(input.uBallMetal, 0, 1, d.uBallMetal),

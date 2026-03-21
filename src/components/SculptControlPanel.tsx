@@ -244,6 +244,57 @@ export function SculptControlPanel() {
                 value={slice.uBallMetal}
                 onChange={(uBallMetal) => patchEditSlice({ uBallMetal })}
               />
+              <h4 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                Grade (HSV / contrast / rim)
+              </h4>
+              <RangeRow
+                label="Hue shift"
+                min={-1}
+                max={1}
+                step={0.005}
+                value={slice.uHueShift}
+                onChange={(uHueShift) => patchEditSlice({ uHueShift })}
+              />
+              <RangeRow
+                label="Saturation"
+                min={0}
+                max={2}
+                step={0.01}
+                value={slice.uSat}
+                onChange={(uSat) => patchEditSlice({ uSat })}
+              />
+              <RangeRow
+                label="Brightness (value)"
+                min={0}
+                max={2}
+                step={0.01}
+                value={slice.uValue}
+                onChange={(uValue) => patchEditSlice({ uValue })}
+              />
+              <RangeRow
+                label="Contrast"
+                min={0.35}
+                max={2.2}
+                step={0.01}
+                value={slice.uContrast}
+                onChange={(uContrast) => patchEditSlice({ uContrast })}
+              />
+              <RangeRow
+                label="Ambient lift"
+                min={0}
+                max={0.35}
+                step={0.005}
+                value={slice.uAmbient}
+                onChange={(uAmbient) => patchEditSlice({ uAmbient })}
+              />
+              <RangeRow
+                label="Rim (fresnel)"
+                min={0}
+                max={1}
+                step={0.01}
+                value={slice.uRim}
+                onChange={(uRim) => patchEditSlice({ uRim })}
+              />
             </section>
 
             <section className="grid gap-4">
