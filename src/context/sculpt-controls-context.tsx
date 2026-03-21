@@ -51,6 +51,14 @@ type SculptControlsContextValue = {
   setEditBreakpoint: (id: ViewportBreakpointId) => void
   liveBreakpoint: ViewportBreakpointId
   patchEditSlice: (patch: Partial<SculptVisualSettings>) => void
+  /** Update any theme’s breakpoint slice (e.g. set light bg while dark theme is active). */
+  patchBreakpointSliceForTheme: (
+    mode: BackgroundAppearanceMode,
+    breakpoint: ViewportBreakpointId,
+    patch: Partial<SculptVisualSettings>,
+  ) => void
+  /** Full storage; use for reading sibling theme fields in the panel. */
+  panelsByTheme: SculptPanelsByTheme
   resetEditSlice: () => void
 }
 
@@ -146,6 +154,26 @@ export function SculptControlsProvider({ children }: { children: ReactNode }) {
     }))
   }, [editBreakpoint])
 
+  const patchBreakpointSliceForTheme = useCallback(
+    (
+      mode: BackgroundAppearanceMode,
+      breakpoint: ViewportBreakpointId,
+      patch: Partial<SculptVisualSettings>,
+    ) => {
+      setPanelsByTheme((prev) => ({
+        ...prev,
+        [mode]: {
+          ...prev[mode],
+          [breakpoint]: sanitizeSculptVisualSettings({
+            ...prev[mode][breakpoint],
+            ...patch,
+          }),
+        },
+      }))
+    },
+    [],
+  )
+
   const resetEditSlice = useCallback(() => {
     const row = defaultSculptSliceForTheme(backgroundAppearanceMode)
     setPerBreakpoint((prev) => ({
@@ -175,16 +203,20 @@ export function SculptControlsProvider({ children }: { children: ReactNode }) {
       setEditBreakpoint,
       liveBreakpoint,
       patchEditSlice,
+      patchBreakpointSliceForTheme,
+      panelsByTheme,
       resetEditSlice,
     }),
     [
       backgroundAppearanceMode,
+      panelsByTheme,
       perBreakpoint,
       editBreakpoint,
       liveBreakpoint,
       timePaused,
       sculptPanelOpen,
       patchEditSlice,
+      patchBreakpointSliceForTheme,
       resetEditSlice,
     ],
   )

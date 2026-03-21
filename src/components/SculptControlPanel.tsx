@@ -12,6 +12,7 @@ import {
   DrawerTrigger,
 } from '@/components/ui/drawer'
 import { Label } from '@/components/ui/label'
+import type { BackgroundAppearanceMode } from '@/config/backgroundTheme'
 import {
   sculptBreakpointLabel,
   useSculptControls,
@@ -94,10 +95,12 @@ export function SculptControlPanel() {
   const {
     backgroundAppearanceMode,
     perBreakpoint,
+    panelsByTheme,
     editBreakpoint,
     setEditBreakpoint,
     liveBreakpoint,
     patchEditSlice,
+    patchBreakpointSliceForTheme,
     resetEditSlice,
     sculptPanelOpen,
     setSculptPanelOpen,
@@ -120,6 +123,10 @@ export function SculptControlPanel() {
   const slice = perBreakpoint[editBreakpoint]
 
   const matHex = rgb01ToHex(slice.uMatR, slice.uMatG, slice.uMatB)
+
+  const setBgForTheme = (mode: BackgroundAppearanceMode, hex: string) => {
+    patchBreakpointSliceForTheme(mode, editBreakpoint, { bgColor: hex })
+  }
 
   return (
     <Drawer
@@ -183,10 +190,10 @@ export function SculptControlPanel() {
             <div className="min-w-0 flex-1 space-y-1.5">
               <DrawerTitle>Sculpt &amp; background</DrawerTitle>
               <DrawerDescription className="text-left">
-                Values are saved per Tailwind breakpoint (min-width) and per site appearance (
+                Material sliders use the active site theme (
                 <span className="font-medium text-foreground">{backgroundAppearanceMode}</span>
-                ). Switch light/dark theme to edit the other set. The canvas uses the preset for
-                your current viewport:{' '}
+                ); background colors below can be set for both dark and light. The canvas uses the
+                preset for your current viewport:{' '}
                 <span className="font-medium text-foreground">{liveBreakpoint}</span>{' '}
                 ({sculptBreakpointLabel(liveBreakpoint)}).
                 {editBreakpoint !== liveBreakpoint && sculptPanelOpen ? (
@@ -362,13 +369,19 @@ export function SculptControlPanel() {
             <section className="grid gap-4 lg:col-span-2">
               <h3 className="text-sm font-semibold">Background</h3>
               <p className="text-xs text-muted-foreground">
-                Drives WebGL clear color (ray misses and the buffer edge) plus the CSS plate under
-                the canvas. With the panel open, previews the preset you are editing.
+                Per breakpoint tab above: each color drives WebGL clear (ray misses) and the CSS
+                plate for that appearance. With the panel open, clear color previews the active
+                theme’s preset for the tab you are editing.
               </p>
               <ColorRow
-                label="Color"
-                value={slice.bgColor}
-                onChange={(bgColor) => patchEditSlice({ bgColor })}
+                label="Color (dark mode)"
+                value={panelsByTheme.dark[editBreakpoint].bgColor}
+                onChange={(hex) => setBgForTheme('dark', hex)}
+              />
+              <ColorRow
+                label="Color (light mode)"
+                value={panelsByTheme.light[editBreakpoint].bgColor}
+                onChange={(hex) => setBgForTheme('light', hex)}
               />
             </section>
           </div>
