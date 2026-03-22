@@ -54,7 +54,10 @@ export const DEFAULT_SCULPT_VISUAL: SculptVisualSettings = {
 export const DEFAULT_PER_BREAKPOINT_TRANSFORM_OVERRIDES: Partial<
   Record<ViewportBreakpointId, Pick<SculptUniformSnapshot, 'uPosX' | 'uPosY' | 'uPosZ' | '_scale'>>
 > = {
-  xl: { uPosX: 0.52, uPosY: 0, uPosZ: 0, _scale: 1.31 },
+  md: { uPosX: 0, uPosY: 0, uPosZ: 0, _scale: 1.63 },
+  lg: { uPosX: 0.345, uPosY: 0, uPosZ: 0, _scale: 1.81 },
+  xl: { uPosX: 0.38, uPosY: 0, uPosZ: 0, _scale: 1.85 },
+  '2xl': { uPosX: 0.29, uPosY: 0, uPosZ: 0, _scale: 2 },
 }
 
 export type PerBreakpointSculptSettings = Record<ViewportBreakpointId, SculptVisualSettings>
