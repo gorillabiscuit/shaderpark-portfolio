@@ -1,15 +1,30 @@
-import { buildBackgroundSculptSource, SCULPT_RAYMARCH_PRESETS } from '@/shader-park/backgroundSculpt'
+import {
+  buildBackgroundSculptSource,
+  buildScene2CircleSculptSource,
+  SCULPT_RAYMARCH_PRESETS,
+} from '@/shader-park/backgroundSculpt'
 
 export type SculptRenderPreset = keyof typeof SCULPT_RAYMARCH_PRESETS
 
 export const SCULPT_RENDER_PRESETS = SCULPT_RAYMARCH_PRESETS
 
-/** App and embed use the low raymarch tier only. */
-export function sculptSourceForLowQuality(): string {
-  return buildBackgroundSculptSource(SCULPT_RAYMARCH_PRESETS.low)
+export type SculptSceneId = 1 | 2
+
+const low = SCULPT_RAYMARCH_PRESETS.low
+
+/** App uses low raymarch tier; pick scene geometry. */
+export function sculptSourceForScene(sceneId: SculptSceneId): string {
+  if (sceneId === 2) return buildScene2CircleSculptSource(low)
+  return buildBackgroundSculptSource(low)
 }
 
-/** @deprecated use sculptSourceForLowQuality — presets are no longer user-selectable */
+/** @deprecated use sculptSourceForScene(1) */
+export function sculptSourceForLowQuality(): string {
+  return sculptSourceForScene(1)
+}
+
+/** @deprecated use sculptSourceForScene + preset helpers */
 export function sculptSourceForPreset(preset: SculptRenderPreset): string {
+  if (preset === 'low') return buildBackgroundSculptSource(SCULPT_RAYMARCH_PRESETS.low)
   return buildBackgroundSculptSource(SCULPT_RAYMARCH_PRESETS[preset])
 }

@@ -111,6 +111,8 @@ export function SculptControlPanel() {
     timePaused,
     setTimePaused,
     sculptSource,
+    sculptSceneId,
+    setSculptSceneId,
     fullSculptDebug,
   } = useSculptControls()
 
@@ -205,6 +207,28 @@ export function SculptControlPanel() {
           <span className="hidden sm:inline">
             {backgroundAppearanceMode === 'light' ? 'Dark' : 'Light'}
           </span>
+        </Button>
+        <Button
+          type="button"
+          size="sm"
+          variant={sculptSceneId === 1 ? 'default' : 'secondary'}
+          className="shadow-md min-w-9 px-3 font-mono tabular-nums"
+          aria-pressed={sculptSceneId === 1}
+          aria-label="Scene 1 — torus sculpture"
+          onClick={() => setSculptSceneId(1)}
+        >
+          1
+        </Button>
+        <Button
+          type="button"
+          size="sm"
+          variant={sculptSceneId === 2 ? 'default' : 'secondary'}
+          className="shadow-md min-w-9 px-3 font-mono tabular-nums"
+          aria-pressed={sculptSceneId === 2}
+          aria-label="Scene 2 — sphere"
+          onClick={() => setSculptSceneId(2)}
+        >
+          2
         </Button>
       </div>
       <DrawerContent side="left" className="gap-0 p-0">

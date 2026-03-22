@@ -1,7 +1,7 @@
 import { lazy, Suspense } from 'react'
-import { sculptSourceForLowQuality } from '@/lib/shaderParkRenderSettings'
+import { sculptSourceForScene } from '@/lib/shaderParkRenderSettings'
 
-const embedSculptSource = sculptSourceForLowQuality()
+const embedSculptSource = sculptSourceForScene(1)
 
 const ShaderParkBackground = lazy(() =>
   import('@/components/ShaderParkBackground').then((m) => ({ default: m.ShaderParkBackground })),

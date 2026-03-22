@@ -34,7 +34,7 @@ import { useTheme } from 'next-themes'
 import { useLocation } from 'react-router-dom'
 import { isAppMainShaderRoute } from '@/lib/shaderParkAppRoutes'
 import { isFullSculptDebugHost } from '@/lib/sculptPanelHost'
-import { sculptSourceForLowQuality } from '@/lib/shaderParkRenderSettings'
+import { sculptSourceForScene, type SculptSceneId } from '@/lib/shaderParkRenderSettings'
 import {
   activeViewportBreakpoint,
   breakpointMinWidth,
@@ -76,6 +76,9 @@ type SculptControlsContextValue = {
   resetEditSlice: () => void
   /** Compiled sculpt (low raymarch tier only). */
   sculptSource: string
+  /** Active background sculpture (1 = torus composition, 2 = sphere). */
+  sculptSceneId: SculptSceneId
+  setSculptSceneId: React.Dispatch<React.SetStateAction<SculptSceneId>>
   /** False only on www.wouterschreuders.com (slim panel). True on localhost and other hosts. */
   fullSculptDebug: boolean
 }
@@ -103,7 +106,11 @@ export function SculptControlsProvider({ children }: { children: ReactNode }) {
   const [storage, setStorage] = useState<SculptStorageState>(loadSculptStorageState)
 
   const fullSculptDebug = isFullSculptDebugHost()
-  const sculptSource = useMemo(() => sculptSourceForLowQuality(), [])
+  const [sculptSceneId, setSculptSceneId] = useState<SculptSceneId>(1)
+  const sculptSource = useMemo(
+    () => sculptSourceForScene(sculptSceneId),
+    [sculptSceneId],
+  )
 
   const panelsByTheme = useMemo(() => buildPanelsByTheme(storage), [storage])
 
@@ -287,6 +294,8 @@ export function SculptControlsProvider({ children }: { children: ReactNode }) {
       panelsByTheme,
       resetEditSlice,
       sculptSource,
+      sculptSceneId,
+      setSculptSceneId,
       fullSculptDebug,
     }),
     [
@@ -303,6 +312,7 @@ export function SculptControlsProvider({ children }: { children: ReactNode }) {
       resetEditSlice,
       setPerBreakpoint,
       sculptSource,
+      sculptSceneId,
       fullSculptDebug,
     ],
   )

@@ -1,8 +1,23 @@
 import { describe, expect, it } from 'vitest'
-import { sculptSourceForLowQuality, sculptSourceForPreset } from '@/lib/shaderParkRenderSettings'
+import { sculptSourceForLowQuality, sculptSourceForPreset, sculptSourceForScene } from '@/lib/shaderParkRenderSettings'
+
+describe('sculptSourceForScene', () => {
+  it('scene 1 is torus composition', () => {
+    const src = sculptSourceForScene(1)
+    expect(src).toContain('setGeometryQuality(12)')
+    expect(src).toContain('torus(outerR, outerTube)')
+  })
+
+  it('scene 2 is a sphere', () => {
+    const src = sculptSourceForScene(2)
+    expect(src).toContain('setGeometryQuality(12)')
+    expect(src).toContain('sphere(0.38)')
+    expect(src).not.toContain('torus(outerR, outerTube)')
+  })
+})
 
 describe('sculptSourceForLowQuality', () => {
-  it('matches low preset numbers', () => {
+  it('matches scene 1 low preset numbers', () => {
     const src = sculptSourceForLowQuality()
     expect(src).toContain('setGeometryQuality(12)')
     expect(src).toContain('setMaxIterations(48)')
