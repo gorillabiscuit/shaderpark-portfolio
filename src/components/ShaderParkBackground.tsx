@@ -42,6 +42,45 @@ export type ShaderParkBackgroundProps = {
   ignoreGlobalPointerRef?: MutableRefObject<boolean>
 }
 
+type CanvasWithDispose = HTMLCanvasElement & {
+  __shaderParkDispose?: () => void
+}
+
+/**
+ * shader-park-core minimal renderer has no public dispose; it registers `resize` and an endless
+ * `requestAnimationFrame` chain. We patch RAF during init, capture `resize`, and on cleanup stop
+ * the chain, remove listeners, and lose the WebGL context.
+ */
+function teardownShaderParkMinimalRenderer(
+  canvas: HTMLCanvasElement,
+  gl: WebGL2RenderingContext | null,
+  capturedResize: EventListener[],
+  removeOverrides: () => void,
+  uninstallGlobal: () => void,
+  restoreRaf: () => void,
+) {
+  for (const fn of capturedResize) {
+    try {
+      window.removeEventListener('resize', fn)
+    } catch {
+      /* ignore */
+    }
+  }
+  removeOverrides()
+  uninstallGlobal()
+  try {
+    const lose = gl?.getExtension('WEBGL_lose_context')
+    lose?.loseContext()
+  } catch {
+    /* ignore */
+  }
+  restoreRaf()
+  const c = canvas as CanvasWithDispose
+  if (c.__shaderParkDispose) {
+    delete c.__shaderParkDispose
+  }
+}
+
 /**
  * WebGL2 sculpture via shader-park-core minimal renderer.
  *
@@ -72,33 +111,78 @@ export function ShaderParkBackground({
     const canvas = canvasRef.current
     if (!canvas) return
 
+    let disposed = false
+    const origRaf = window.requestAnimationFrame.bind(window)
+    window.requestAnimationFrame = (cb: FrameRequestCallback) => {
+      return origRaf((time: number) => {
+        if (disposed) return
+        cb(time)
+      })
+    }
+    const restoreRaf = () => {
+      window.requestAnimationFrame = origRaf
+    }
+
+    const capturedResize: EventListener[] = []
+    const origWindowAdd = window.addEventListener.bind(window) as (
+      type: string,
+      listener: EventListenerOrEventListenerObject,
+      options?: boolean | AddEventListenerOptions,
+    ) => void
+    window.addEventListener = ((
+      type: string,
+      listener: EventListenerOrEventListenerObject,
+      options?: boolean | AddEventListenerOptions,
+    ) => {
+      if (type === 'resize' && typeof listener === 'function') {
+        capturedResize.push(listener)
+      }
+      return origWindowAdd(type, listener, options)
+    }) as typeof window.addEventListener
+
     const uninstallGlobal = globalMouse
       ? installGlobalMouseForShaderParkCanvas(canvas, {
           ignorePointerRef: ignoreGlobalPointerRef,
         })
       : () => {}
 
-    sculptToMinimalRenderer(canvas, backgroundSculptSource, () => {
-      const u = sanitizeUniformSnapshot(uniformsRef.current)
-      return {
-        uMatR: u.uMatR,
-        uMatG: u.uMatG,
-        uMatB: u.uMatB,
-        uHueShift: u.uHueShift,
-        uSat: u.uSat,
-        uValue: u.uValue,
-        uContrast: u.uContrast,
-        uAmbient: u.uAmbient,
-        uRim: u.uRim,
-        uMetal: u.uMetal,
-        uShine: u.uShine,
-        uBallMetal: u.uBallMetal,
-        uPosX: u.uPosX,
-        uPosY: u.uPosY,
-        uPosZ: u.uPosZ,
-        _scale: u._scale,
+    try {
+      sculptToMinimalRenderer(canvas, backgroundSculptSource, () => {
+        const u = sanitizeUniformSnapshot(uniformsRef.current)
+        return {
+          uMatR: u.uMatR,
+          uMatG: u.uMatG,
+          uMatB: u.uMatB,
+          uHueShift: u.uHueShift,
+          uSat: u.uSat,
+          uValue: u.uValue,
+          uContrast: u.uContrast,
+          uAmbient: u.uAmbient,
+          uRim: u.uRim,
+          uMetal: u.uMetal,
+          uShine: u.uShine,
+          uBallMetal: u.uBallMetal,
+          uPosX: u.uPosX,
+          uPosY: u.uPosY,
+          uPosZ: u.uPosZ,
+          _scale: u._scale,
+        }
+      })
+    } catch (err) {
+      disposed = true
+      for (const fn of capturedResize) {
+        try {
+          window.removeEventListener('resize', fn)
+        } catch {
+          /* ignore */
+        }
       }
-    })
+      restoreRaf()
+      uninstallGlobal()
+      throw err
+    } finally {
+      window.addEventListener = origWindowAdd
+    }
 
     const gl = canvas.getContext('webgl2') as WebGL2RenderingContext | null
     const removeOverrides =
@@ -108,9 +192,24 @@ export function ShaderParkBackground({
           })
         : () => {}
 
+    let tornDown = false
+    const dispose = () => {
+      if (tornDown) return
+      tornDown = true
+      disposed = true
+      teardownShaderParkMinimalRenderer(
+        canvas,
+        gl,
+        capturedResize,
+        removeOverrides,
+        uninstallGlobal,
+        restoreRaf,
+      )
+    }
+    ;(canvas as CanvasWithDispose).__shaderParkDispose = dispose
+
     return () => {
-      removeOverrides()
-      uninstallGlobal()
+      ;(canvas as CanvasWithDispose).__shaderParkDispose?.()
     }
   }, [globalMouse, uniformsRef, clearRgbRef, ignoreGlobalPointerRef])
 

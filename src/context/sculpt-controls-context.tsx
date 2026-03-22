@@ -31,6 +31,8 @@ import {
   type SculptVisualSettings,
 } from '@/lib/sculptControls'
 import { useTheme } from 'next-themes'
+import { useLocation } from 'react-router-dom'
+import { isAppMainShaderRoute } from '@/lib/shaderParkAppRoutes'
 import {
   activeViewportBreakpoint,
   breakpointMinWidth,
@@ -81,6 +83,7 @@ export function useSculptControls() {
 }
 
 export function SculptControlsProvider({ children }: { children: ReactNode }) {
+  const { pathname } = useLocation()
   const { resolvedTheme } = useTheme()
   const backgroundAppearanceMode: BackgroundAppearanceMode =
     resolvedTheme === 'light' ? 'light' : 'dark'
@@ -159,6 +162,13 @@ export function SculptControlsProvider({ children }: { children: ReactNode }) {
     window.addEventListener('resize', onResize)
     return () => window.removeEventListener('resize', onResize)
   }, [])
+
+  useEffect(() => {
+    if (!isAppMainShaderRoute(pathname)) {
+      setSculptPanelOpen(false)
+      setTimePaused(false)
+    }
+  }, [pathname])
 
   const liveSlice = useMemo(
     () => sanitizeSculptVisualSettings(perBreakpoint[liveBreakpoint]),
