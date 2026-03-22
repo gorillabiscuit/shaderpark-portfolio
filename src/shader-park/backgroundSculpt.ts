@@ -7,11 +7,11 @@
  *
  * Material grading uses `glslFuncES3`: the JS-side `mix()` helper is float-only, so HSV + contrast
  * run in GLSL. `fresnel()` adds view-dependent rim (see Shader Park material docs).
+ *
+ * Raymarch cost: tune via `buildBackgroundSculptSource` (geometry quality, max iterations, step size)
+ * — see Shader Park global settings docs.
  */
-export const backgroundSculptSource = `
-setGeometryQuality(88);
-setMaxIterations(420);
-
+const BACKGROUND_SCULPT_BODY = `
 var uMatR = input(0.6235294117647059, 0, 1);
 var uMatG = input(0.9411764705882353, 0, 1);
 var uMatB = input(0.058823529411764705, 0, 1);
@@ -107,3 +107,39 @@ shape(function() {
   sphere(ballR);
 })();
 `.trim()
+
+export type BackgroundSculptRaymarchOpts = {
+  geometryQuality: number
+  maxIterations: number
+  /** Omit to use Shader Park default step size. */
+  stepSize?: number
+}
+
+export function buildBackgroundSculptSource(opts: BackgroundSculptRaymarchOpts): string {
+  const stepLine =
+    opts.stepSize != null && opts.stepSize > 0
+      ? `setStepSize(${opts.stepSize});`
+      : ''
+  return `
+setGeometryQuality(${opts.geometryQuality});
+setMaxIterations(${opts.maxIterations});
+${stepLine}
+${BACKGROUND_SCULPT_BODY}
+`.trim()
+}
+
+/**
+ * Raymarch cost tiers (Shader Park `setGeometryQuality` / `setMaxIterations` / `setStepSize`).
+ * **Low** is aggressive for GPU/battery; **high** is the previous flagship defaults (88 / 420 / 0.85).
+ */
+export const SCULPT_RAYMARCH_PRESETS = {
+  /** Extreme budget tier — expect banding, softer edges, possible holes in tight CSG. */
+  low: { geometryQuality: 12, maxIterations: 48, stepSize: 0.993 },
+  balanced: { geometryQuality: 48, maxIterations: 248, stepSize: 0.9 },
+  high: { geometryQuality: 88, maxIterations: 420, stepSize: 0.85 },
+} as const satisfies Record<string, BackgroundSculptRaymarchOpts>
+
+export type SculptRaymarchPresetId = keyof typeof SCULPT_RAYMARCH_PRESETS
+
+/** Default sculpt string for fallbacks (e.g. ShaderParkBackground before provider mounts): **low** tier. */
+export const backgroundSculptSource = buildBackgroundSculptSource(SCULPT_RAYMARCH_PRESETS.low)

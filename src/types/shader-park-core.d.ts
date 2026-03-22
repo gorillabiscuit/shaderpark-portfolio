@@ -5,7 +5,15 @@ declare module 'shader-park-core' {
     updateUniforms?: () => Record<string, number | number[]>
   ): void
 
-  export function sculptToGLSL(userProvidedSrc: string | (() => void)): unknown
+  export function sculptToGLSL(userProvidedSrc: string | (() => void)): {
+    uniforms: unknown
+    stepSizeConstant: number
+    maxIterations: number
+    maxReflections: number
+    geoGLSL: string
+    colorGLSL: string
+    error?: string
+  }
   export function generatedGLSLToMinimalRenderer(
     canvas: HTMLCanvasElement,
     generatedGLSL: {

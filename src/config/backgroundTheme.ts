@@ -2,7 +2,10 @@ import type { SculptVisualSettings } from '@/lib/sculptControls'
 
 /**
  * Background + sculpt defaults for each site appearance.
- * Values merge on top of `DEFAULT_SCULPT_VISUAL` for every breakpoint (see `defaultPerBreakpointForTheme`).
+ * Material + `bgColor` here are **global per theme**: they merge on top of `DEFAULT_SCULPT_VISUAL`
+ * for **every** viewport tier. Only position / `_scale` differ per breakpoint
+ * (`DEFAULT_PER_BREAKPOINT_TRANSFORM_OVERRIDES` + stored `transforms`); see `defaultPerBreakpointForTheme`
+ * and `buildPerBreakpointForTheme` in `sculptControls.ts`.
  */
 export type BackgroundAppearanceMode = 'dark' | 'light'
 

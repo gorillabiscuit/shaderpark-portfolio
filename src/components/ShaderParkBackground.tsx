@@ -40,6 +40,8 @@ export type ShaderParkBackgroundProps = {
    * to the shader (mouse uniform stays at last value).
    */
   ignoreGlobalPointerRef?: MutableRefObject<boolean>
+  /** Full Shader Park JS source; changing this recompiles and remounts the renderer. */
+  sculptSource?: string
 }
 
 type CanvasWithDispose = HTMLCanvasElement & {
@@ -98,6 +100,7 @@ export function ShaderParkBackground({
   uniformsRef: uniformsRefProp,
   clearRgbRef: clearRgbRefProp,
   ignoreGlobalPointerRef,
+  sculptSource = backgroundSculptSource,
 }: ShaderParkBackgroundProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const fallbackUniformsRef = useRef<SculptUniformSnapshot>(
@@ -147,7 +150,7 @@ export function ShaderParkBackground({
       : () => {}
 
     try {
-      sculptToMinimalRenderer(canvas, backgroundSculptSource, () => {
+      sculptToMinimalRenderer(canvas, sculptSource, () => {
         const u = sanitizeUniformSnapshot(uniformsRef.current)
         return {
           uMatR: u.uMatR,
@@ -211,10 +214,13 @@ export function ShaderParkBackground({
     return () => {
       ;(canvas as CanvasWithDispose).__shaderParkDispose?.()
     }
-  }, [globalMouse, uniformsRef, clearRgbRef, ignoreGlobalPointerRef])
+  }, [globalMouse, uniformsRef, clearRgbRef, ignoreGlobalPointerRef, sculptSource])
 
+  // Remount canvas when `sculptSource` changes: after WEBGL_lose_context the same element often
+  // cannot acquire a new WebGL2 context, so `sculptToMinimalRenderer` would run on a dead surface.
   return (
     <canvas
+      key={sculptSource}
       ref={canvasRef}
       className={cn(
         'pointer-events-none block h-full w-full',

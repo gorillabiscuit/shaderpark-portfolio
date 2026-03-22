@@ -125,7 +125,10 @@ export function patchAppearanceOnlyFields(
   return extractAppearance(full)
 }
 
-/** One theme: same material/bg for every tier; transforms differ per tier. */
+/**
+ * One theme: **one** `appearance` (material + bg) shared by every breakpoint row; only
+ * `transforms[id]` (position / scale) varies per tier.
+ */
 export function buildPerBreakpointForTheme(
   appearance: SculptAppearanceOnly,
   transforms: PerBreakpointPositionScale,
@@ -465,6 +468,7 @@ export function defaultSculptSliceForTheme(
   })
 }
 
+/** Defaults: same material/bg `seed` for every breakpoint; overrides are transform-only per tier. */
 export function defaultPerBreakpointForTheme(
   mode: BackgroundAppearanceMode,
 ): PerBreakpointSculptSettings {

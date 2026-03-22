@@ -1,4 +1,7 @@
 import { lazy, Suspense } from 'react'
+import { sculptSourceForLowQuality } from '@/lib/shaderParkRenderSettings'
+
+const embedSculptSource = sculptSourceForLowQuality()
 
 const ShaderParkBackground = lazy(() =>
   import('@/components/ShaderParkBackground').then((m) => ({ default: m.ShaderParkBackground })),
@@ -12,7 +15,7 @@ export function EmbedPage() {
   return (
     <div className="fixed inset-0 bg-[#f4f4f2]">
       <Suspense fallback={<div className="absolute inset-0 animate-pulse bg-neutral-200/80" aria-hidden />}>
-        <ShaderParkBackground variant="inline" />
+        <ShaderParkBackground variant="inline" sculptSource={embedSculptSource} />
       </Suspense>
     </div>
   )

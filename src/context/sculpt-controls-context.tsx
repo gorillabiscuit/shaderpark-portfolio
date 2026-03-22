@@ -33,6 +33,8 @@ import {
 import { useTheme } from 'next-themes'
 import { useLocation } from 'react-router-dom'
 import { isAppMainShaderRoute } from '@/lib/shaderParkAppRoutes'
+import { isFullSculptDebugHost } from '@/lib/sculptPanelHost'
+import { sculptSourceForLowQuality } from '@/lib/shaderParkRenderSettings'
 import {
   activeViewportBreakpoint,
   breakpointMinWidth,
@@ -72,6 +74,10 @@ type SculptControlsContextValue = {
   /** Full merged panels for UI (dark/light × breakpoints). */
   panelsByTheme: SculptPanelsByTheme
   resetEditSlice: () => void
+  /** Compiled sculpt (low raymarch tier only). */
+  sculptSource: string
+  /** False only on www.wouterschreuders.com (slim panel). True on localhost and other hosts. */
+  fullSculptDebug: boolean
 }
 
 const SculptControlsContext = createContext<SculptControlsContextValue | null>(null)
@@ -95,6 +101,9 @@ export function SculptControlsProvider({ children }: { children: ReactNode }) {
   timePausedRef.current = timePaused
   const [sculptPanelOpen, setSculptPanelOpen] = useState(false)
   const [storage, setStorage] = useState<SculptStorageState>(loadSculptStorageState)
+
+  const fullSculptDebug = isFullSculptDebugHost()
+  const sculptSource = useMemo(() => sculptSourceForLowQuality(), [])
 
   const panelsByTheme = useMemo(() => buildPanelsByTheme(storage), [storage])
 
@@ -189,7 +198,7 @@ export function SculptControlsProvider({ children }: { children: ReactNode }) {
     (patch: Partial<SculptVisualSettings>) => {
       setStorage((prev) => {
         const mode = backgroundAppearanceMode
-        const bp = editBreakpoint
+        const bp = fullSculptDebug ? editBreakpoint : liveBreakpoint
         let transforms = prev.transforms
         const { uPosX, uPosY, uPosZ, _scale, ...appearancePatch } = patch
         if (
@@ -223,7 +232,7 @@ export function SculptControlsProvider({ children }: { children: ReactNode }) {
         return { ...prev, transforms, appearance }
       })
     },
-    [backgroundAppearanceMode, editBreakpoint],
+    [backgroundAppearanceMode, editBreakpoint, liveBreakpoint, fullSculptDebug],
   )
 
   const patchAppearanceForTheme = useCallback(
@@ -241,7 +250,7 @@ export function SculptControlsProvider({ children }: { children: ReactNode }) {
 
   const resetEditSlice = useCallback(() => {
     setStorage((prev) => {
-      const bp = editBreakpoint
+      const bp = fullSculptDebug ? editBreakpoint : liveBreakpoint
       return {
         ...prev,
         transforms: {
@@ -250,7 +259,7 @@ export function SculptControlsProvider({ children }: { children: ReactNode }) {
         },
       }
     })
-  }, [editBreakpoint])
+  }, [editBreakpoint, liveBreakpoint, fullSculptDebug])
 
   useEffect(() => {
     const t = window.setTimeout(() => saveSculptStorageState(storage), 400)
@@ -277,6 +286,8 @@ export function SculptControlsProvider({ children }: { children: ReactNode }) {
       patchAppearanceForTheme,
       panelsByTheme,
       resetEditSlice,
+      sculptSource,
+      fullSculptDebug,
     }),
     [
       backgroundAppearanceMode,
@@ -291,6 +302,8 @@ export function SculptControlsProvider({ children }: { children: ReactNode }) {
       patchAppearanceForTheme,
       resetEditSlice,
       setPerBreakpoint,
+      sculptSource,
+      fullSculptDebug,
     ],
   )
 
