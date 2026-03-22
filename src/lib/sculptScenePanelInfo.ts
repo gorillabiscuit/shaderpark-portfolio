@@ -41,10 +41,10 @@ const SCENE_2_YELLOW: [number, number, number] = [1.0, 0.92, 0.08]
 
 /** Scene 3 `palette(t, a,b,c,d)` — vectors a–d in GLSL (labels for the editable panel). */
 const SCENE_3_PALETTE: { label: string; rgb: [number, number, number] }[] = [
-  { label: 'Palette a (offset)', rgb: [0.5, 0.52, 0.53] },
-  { label: 'Palette b (cos amp)', rgb: [0.46, 0.22, 0.35] },
-  { label: 'Palette c (freq)', rgb: [0.82, 0.84, 0.65] },
-  { label: 'Palette d (phase)', rgb: [0.53, 0.23, 0.22] },
+  { label: 'Palette a (offset)', rgb: [172 / 255, 192 / 255, 200 / 255] },
+  { label: 'Palette b (cos amp)', rgb: [168 / 255, 146 / 255, 36 / 255] },
+  { label: 'Palette c (freq)', rgb: [137 / 255, 57 / 255, 104 / 255] },
+  { label: 'Palette d (phase)', rgb: [67 / 255, 41 / 255, 40 / 255] },
 ]
 
 /** Row labels for scene 3 palette colour pickers (order matches `palette` in storage). */

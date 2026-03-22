@@ -27,10 +27,10 @@ export type Scene3Params = {
 
 export const DEFAULT_SCENE3_PARAMS: Scene3Params = {
   palette: [
-    { r: 0.5, g: 0.52, b: 0.53 },
-    { r: 0.46, g: 0.22, b: 0.35 },
-    { r: 0.82, g: 0.84, b: 0.65 },
-    { r: 0.53, g: 0.23, b: 0.22 },
+    { r: 172 / 255, g: 192 / 255, b: 200 / 255 },
+    { r: 168 / 255, g: 146 / 255, b: 36 / 255 },
+    { r: 137 / 255, g: 57 / 255, b: 104 / 255 },
+    { r: 67 / 255, g: 41 / 255, b: 40 / 255 },
   ],
   idle: {
     phiAmp: 0.38,
