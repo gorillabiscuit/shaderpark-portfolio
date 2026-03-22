@@ -104,7 +104,7 @@ export function ShaderParkBackground({
 }: ShaderParkBackgroundProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const fallbackUniformsRef = useRef<SculptUniformSnapshot>(
-    toUniformSnapshot(DEFAULT_SCULPT_VISUAL),
+    sanitizeUniformSnapshot(toUniformSnapshot(DEFAULT_SCULPT_VISUAL)),
   )
   const uniformsRef = uniformsRefProp ?? fallbackUniformsRef
   const embedClearRgbRef = useRef(hexToRgb01('#f4f4f2'))
@@ -150,27 +150,9 @@ export function ShaderParkBackground({
       : () => {}
 
     try {
-      sculptToMinimalRenderer(canvas, sculptSource, () => {
-        const u = sanitizeUniformSnapshot(uniformsRef.current)
-        return {
-          uMatR: u.uMatR,
-          uMatG: u.uMatG,
-          uMatB: u.uMatB,
-          uHueShift: u.uHueShift,
-          uSat: u.uSat,
-          uValue: u.uValue,
-          uContrast: u.uContrast,
-          uAmbient: u.uAmbient,
-          uRim: u.uRim,
-          uMetal: u.uMetal,
-          uShine: u.uShine,
-          uBallMetal: u.uBallMetal,
-          uPosX: u.uPosX,
-          uPosY: u.uPosY,
-          uPosZ: u.uPosZ,
-          _scale: u._scale,
-        }
-      })
+      sculptToMinimalRenderer(canvas, sculptSource, () =>
+        sanitizeUniformSnapshot(uniformsRef.current),
+      )
     } catch (err) {
       disposed = true
       for (const fn of capturedResize) {

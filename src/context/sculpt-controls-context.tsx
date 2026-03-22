@@ -22,14 +22,17 @@ import {
   mergeVisual,
   patchAppearanceOnlyFields,
   sanitizeSculptVisualSettings,
+  sanitizeUniformSnapshot,
   saveSculptStorageState,
   toUniformSnapshot,
   type PerBreakpointPositionScale,
   type PerBreakpointSculptSettings,
   type SculptPanelsByTheme,
   type SculptStorageState,
+  type SculptUniformSnapshot,
   type SculptVisualSettings,
 } from '@/lib/sculptControls'
+import { mergeScene3Params, scene3ParamsToUniformSlice, type Scene3Params } from '@/lib/scene3SculptParams'
 import { useTheme } from 'next-themes'
 import { useLocation } from 'react-router-dom'
 import { isAppMainShaderRoute } from '@/lib/shaderParkAppRoutes'
@@ -47,7 +50,7 @@ import {
 const NATIVE_DATE_NOW = Date.now
 
 type SculptControlsContextValue = {
-  uniformsRef: MutableRefObject<ReturnType<typeof toUniformSnapshot>>
+  uniformsRef: MutableRefObject<SculptUniformSnapshot>
   /** WebGL clear RGB (sRGB 0–1); read each frame by ShaderParkBackground patches. */
   clearRgbRef: MutableRefObject<{ r: number; g: number; b: number }>
   /** Derived from site theme (`next-themes`). Separate appearance per mode; transforms shared. */
@@ -76,11 +79,14 @@ type SculptControlsContextValue = {
   resetEditSlice: () => void
   /** Compiled sculpt (low raymarch tier only). */
   sculptSource: string
-  /** Active background sculpture (1 = torus composition, 2 = sphere). */
+  /** Active background sculpture (1 = torus, 2 = three rings, 3 = palette slab). */
   sculptSceneId: SculptSceneId
   setSculptSceneId: React.Dispatch<React.SetStateAction<SculptSceneId>>
   /** False only on www.wouterschreuders.com (slim panel). True on localhost and other hosts. */
   fullSculptDebug: boolean
+  /** Scene 3 palette + idle motion (persisted). */
+  scene3Params: Scene3Params
+  patchScene3Params: (patch: Parameters<typeof mergeScene3Params>[1]) => void
 }
 
 const SculptControlsContext = createContext<SculptControlsContextValue | null>(null)
@@ -97,13 +103,15 @@ export function SculptControlsProvider({ children }: { children: ReactNode }) {
   const backgroundAppearanceMode: BackgroundAppearanceMode =
     resolvedTheme === 'light' ? 'light' : 'dark'
 
-  const uniformsRef = useRef(toUniformSnapshot(defaultSculptSliceForTheme('dark')))
+  const uniformsRef = useRef<SculptUniformSnapshot>(
+    sanitizeUniformSnapshot(toUniformSnapshot(defaultSculptSliceForTheme('dark'))),
+  )
   const clearRgbRef = useRef(hexToRgb01(defaultSculptSliceForTheme('dark').bgColor))
   const [timePaused, setTimePaused] = useState(false)
   const timePausedRef = useRef(timePaused)
   timePausedRef.current = timePaused
   const [sculptPanelOpen, setSculptPanelOpen] = useState(false)
-  const [storage, setStorage] = useState<SculptStorageState>(loadSculptStorageState)
+  const [storage, setStorage] = useState<SculptStorageState>(() => loadSculptStorageState())
 
   const fullSculptDebug = isFullSculptDebugHost()
   const [sculptSceneId, setSculptSceneId] = useState<SculptSceneId>(1)
@@ -192,8 +200,11 @@ export function SculptControlsProvider({ children }: { children: ReactNode }) {
   )
 
   useEffect(() => {
-    uniformsRef.current = toUniformSnapshot(liveSlice)
-  }, [liveSlice])
+    uniformsRef.current = sanitizeUniformSnapshot({
+      ...toUniformSnapshot(liveSlice),
+      ...scene3ParamsToUniformSlice(storage.scene3),
+    })
+  }, [liveSlice, storage.scene3])
 
   const editSliceBg = storage.appearance[backgroundAppearanceMode].bgColor
   useEffect(() => {
@@ -268,6 +279,13 @@ export function SculptControlsProvider({ children }: { children: ReactNode }) {
     })
   }, [editBreakpoint, liveBreakpoint, fullSculptDebug])
 
+  const patchScene3Params = useCallback((patch: Parameters<typeof mergeScene3Params>[1]) => {
+    setStorage((prev) => ({
+      ...prev,
+      scene3: mergeScene3Params(prev.scene3, patch),
+    }))
+  }, [])
+
   useEffect(() => {
     const t = window.setTimeout(() => saveSculptStorageState(storage), 400)
     return () => window.clearTimeout(t)
@@ -297,6 +315,8 @@ export function SculptControlsProvider({ children }: { children: ReactNode }) {
       sculptSceneId,
       setSculptSceneId,
       fullSculptDebug,
+      scene3Params: storage.scene3,
+      patchScene3Params,
     }),
     [
       backgroundAppearanceMode,
@@ -314,6 +334,8 @@ export function SculptControlsProvider({ children }: { children: ReactNode }) {
       sculptSource,
       sculptSceneId,
       fullSculptDebug,
+      storage.scene3,
+      patchScene3Params,
     ],
   )
 

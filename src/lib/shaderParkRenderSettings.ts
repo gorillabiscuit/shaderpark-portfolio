@@ -1,6 +1,7 @@
 import {
   buildBackgroundSculptSource,
   buildScene2CircleSculptSource,
+  buildScene3PaletteSculptSource,
   SCULPT_RAYMARCH_PRESETS,
 } from '@/shader-park/backgroundSculpt'
 
@@ -8,13 +9,14 @@ export type SculptRenderPreset = keyof typeof SCULPT_RAYMARCH_PRESETS
 
 export const SCULPT_RENDER_PRESETS = SCULPT_RAYMARCH_PRESETS
 
-export type SculptSceneId = 1 | 2
+export type SculptSceneId = 1 | 2 | 3
 
 const low = SCULPT_RAYMARCH_PRESETS.low
 
 /** App uses low raymarch tier; pick scene geometry. */
 export function sculptSourceForScene(sceneId: SculptSceneId): string {
   if (sceneId === 2) return buildScene2CircleSculptSource(low)
+  if (sceneId === 3) return buildScene3PaletteSculptSource(low)
   return buildBackgroundSculptSource(low)
 }
 

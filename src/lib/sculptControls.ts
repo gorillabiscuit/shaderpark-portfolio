@@ -4,9 +4,15 @@ import {
 } from '@/config/backgroundTheme'
 import type { ViewportBreakpointId } from '@/lib/viewportBreakpoint'
 import { VIEWPORT_BREAKPOINT_ORDER } from '@/lib/viewportBreakpoint'
+import type { Scene3Params, Scene3UniformSlice } from '@/lib/scene3SculptParams'
+import {
+  DEFAULT_SCENE3_PARAMS,
+  sanitizeScene3Params,
+  sanitizeScene3UniformSlice,
+} from '@/lib/scene3SculptParams'
 
-/** Uniforms passed to shader-park `updateUniforms` (must match `input()` names in background sculpt + `_scale`). */
-export type SculptUniformSnapshot = {
+/** Core sculpt `input()` uniforms (material, grade, transform) — no scene-3 extras. */
+export type SculptUniformCore = {
   uMatR: number
   uMatG: number
   uMatB: number
@@ -25,7 +31,10 @@ export type SculptUniformSnapshot = {
   _scale: number
 }
 
-export type SculptVisualSettings = SculptUniformSnapshot & {
+/** Full snapshot passed to `updateUniforms` (includes scene 3 palette slab `input()`s when that scene is active). */
+export type SculptUniformSnapshot = SculptUniformCore & Scene3UniformSlice
+
+export type SculptVisualSettings = SculptUniformCore & {
   /** Solid page / letterbox color (CSS). */
   bgColor: string
 }
@@ -52,7 +61,7 @@ export const DEFAULT_SCULPT_VISUAL: SculptVisualSettings = {
 
 /** Author default transforms per viewport tier (merged on top of theme slice). */
 export const DEFAULT_PER_BREAKPOINT_TRANSFORM_OVERRIDES: Partial<
-  Record<ViewportBreakpointId, Pick<SculptUniformSnapshot, 'uPosX' | 'uPosY' | 'uPosZ' | '_scale'>>
+  Record<ViewportBreakpointId, Pick<SculptUniformCore, 'uPosX' | 'uPosY' | 'uPosZ' | '_scale'>>
 > = {
   md: { uPosX: 0, uPosY: 0, uPosZ: 0, _scale: 1.63 },
   lg: { uPosX: 0.345, uPosY: 0, uPosZ: 0, _scale: 1.81 },
@@ -64,7 +73,7 @@ export type PerBreakpointSculptSettings = Record<ViewportBreakpointId, SculptVis
 
 /** Per breakpoint in clipboard: transform only. */
 export type SculptPositionScaleSlice = Pick<
-  SculptUniformSnapshot,
+  SculptUniformCore,
   'uPosX' | 'uPosY' | 'uPosZ' | '_scale'
 >
 
@@ -88,6 +97,8 @@ export type AppearanceByTheme = Record<BackgroundAppearanceMode, SculptAppearanc
 export type SculptStorageState = {
   transforms: PerBreakpointPositionScale
   appearance: AppearanceByTheme
+  /** Scene 3 palette slab — global (not per theme). */
+  scene3: Scene3Params
 }
 
 export function extractTransform(s: SculptVisualSettings): SculptPositionScaleSlice {
@@ -236,6 +247,7 @@ export function defaultSculptStorageState(): SculptStorageState {
       dark: defaultAppearanceOnlyForTheme('dark'),
       light: defaultAppearanceOnlyForTheme('light'),
     },
+    scene3: sanitizeScene3Params(DEFAULT_SCENE3_PARAMS),
   }
 }
 
@@ -272,6 +284,7 @@ function migrateV2PanelsToStorageState(panels: SculptPanelsByTheme): SculptStora
       dark: pickAppearanceFromLegacyBreakpointRow(darkRow, 'dark'),
       light: pickAppearanceFromLegacyBreakpointRow(lightRow, 'light'),
     },
+    scene3: sanitizeScene3Params(undefined),
   }
 }
 
@@ -335,13 +348,19 @@ function migrateLegacyV3ToV4(legacy: LegacyV3StorageState): SculptStorageState {
       dark: pickAppearanceFromLegacyBreakpointRow(legacy.appearance.dark, 'dark'),
       light: pickAppearanceFromLegacyBreakpointRow(legacy.appearance.light, 'light'),
     },
+    scene3: sanitizeScene3Params(undefined),
   }
 }
 
-function hydrateStorageStateV4(raw: unknown): SculptStorageState | null {
+function hydrateStorageStateV4Or5(raw: unknown): SculptStorageState | null {
   if (!raw || typeof raw !== 'object') return null
-  const p = raw as { version?: unknown; transforms?: unknown; appearance?: unknown }
-  if (p.version !== 4) return null
+  const p = raw as {
+    version?: unknown
+    transforms?: unknown
+    appearance?: unknown
+    scene3?: unknown
+  }
+  if (p.version !== 4 && p.version !== 5) return null
   const defaults = defaultSculptStorageState()
   const transforms = { ...defaults.transforms }
   if (p.transforms && typeof p.transforms === 'object') {
@@ -375,7 +394,8 @@ function hydrateStorageStateV4(raw: unknown): SculptStorageState | null {
       }
     }
   }
-  return { transforms, appearance }
+  const scene3 = sanitizeScene3Params(p.scene3)
+  return { transforms, appearance, scene3 }
 }
 
 export function buildPanelsByTheme(state: SculptStorageState): SculptPanelsByTheme {
@@ -391,8 +411,8 @@ export function loadSculptStorageState(): SculptStorageState {
     if (v3raw) {
       const parsed = JSON.parse(v3raw) as unknown
       const ver = (parsed as { version?: unknown }).version
-      if (ver === 4) {
-        const h = hydrateStorageStateV4(parsed)
+      if (ver === 4 || ver === 5) {
+        const h = hydrateStorageStateV4Or5(parsed)
         if (h) return h
       }
       if (ver === 3) {
@@ -451,7 +471,12 @@ export function saveSculptStorageState(state: SculptStorageState) {
   try {
     localStorage.setItem(
       STORAGE_KEY_V3,
-      JSON.stringify({ version: 4, transforms: state.transforms, appearance: state.appearance }),
+      JSON.stringify({
+        version: 5,
+        transforms: state.transforms,
+        appearance: state.appearance,
+        scene3: state.scene3,
+      }),
     )
   } catch {
     /* ignore quota */
@@ -594,13 +619,14 @@ export function sanitizeSculptVisualSettings(
   }
 }
 
-export function sanitizeUniformSnapshot(u: SculptUniformSnapshot): SculptUniformSnapshot {
-  return toUniformSnapshot(
-    sanitizeSculptVisualSettings({ ...DEFAULT_SCULPT_VISUAL, ...u }),
+export function sanitizeUniformSnapshot(u: Partial<SculptUniformSnapshot>): SculptUniformSnapshot {
+  const base = toUniformSnapshot(
+    sanitizeSculptVisualSettings({ ...DEFAULT_SCULPT_VISUAL, ...u } as LoadedVisualSlice),
   )
+  return { ...base, ...sanitizeScene3UniformSlice(u) }
 }
 
-export function toUniformSnapshot(v: SculptVisualSettings): SculptUniformSnapshot {
+export function toUniformSnapshot(v: SculptVisualSettings): SculptUniformCore {
   const { bgColor: _bg, ...u } = v
   return u
 }
