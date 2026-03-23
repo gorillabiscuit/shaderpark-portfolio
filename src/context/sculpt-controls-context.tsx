@@ -23,7 +23,6 @@ import {
   patchAppearanceOnlyFields,
   sanitizeSculptVisualSettings,
   sanitizeUniformSnapshot,
-  saveSculptStorageState,
   toUniformSnapshot,
   type PerBreakpointPositionScale,
   type PerBreakpointSculptSettings,
@@ -32,7 +31,10 @@ import {
   type SculptUniformSnapshot,
   type SculptVisualSettings,
 } from '@/lib/sculptControls'
-import { mergeScene3Params, scene3ParamsToUniformSlice, type Scene3Params } from '@/lib/scene3SculptParams'
+import {
+  scene4PaletteToUniformSlice,
+  type Scene4PaletteByTheme,
+} from '@/lib/scene4Palette'
 import { useTheme } from 'next-themes'
 import { useLocation } from 'react-router-dom'
 import { isAppMainShaderRoute } from '@/lib/shaderParkAppRoutes'
@@ -84,9 +86,11 @@ type SculptControlsContextValue = {
   setSculptSceneId: React.Dispatch<React.SetStateAction<SculptSceneId>>
   /** False only on www.wouterschreuders.com (slim panel). True on localhost and other hosts. */
   fullSculptDebug: boolean
-  /** Scene 3 palette + idle motion (persisted). */
-  scene3Params: Scene3Params
-  patchScene3Params: (patch: Parameters<typeof mergeScene3Params>[1]) => void
+  scene4PaletteByTheme: Scene4PaletteByTheme
+  patchScene4PaletteForTheme: (
+    mode: BackgroundAppearanceMode,
+    patch: Partial<Record<0 | 1 | 2 | 3, { r?: number; g?: number; b?: number }>>,
+  ) => void
 }
 
 const SculptControlsContext = createContext<SculptControlsContextValue | null>(null)
@@ -200,11 +204,14 @@ export function SculptControlsProvider({ children }: { children: ReactNode }) {
   )
 
   useEffect(() => {
+    const next = toUniformSnapshot(liveSlice)
+    const scene4Uniforms = scene4PaletteToUniformSlice(storage.scene4PaletteByTheme[backgroundAppearanceMode])
     uniformsRef.current = sanitizeUniformSnapshot({
-      ...toUniformSnapshot(liveSlice),
-      ...scene3ParamsToUniformSlice(storage.scene3),
+      ...next,
+      ...scene4Uniforms,
+      _scale: sculptSceneId === 3 || sculptSceneId === 4 ? 1 : next._scale,
     })
-  }, [liveSlice, storage.scene3])
+  }, [liveSlice, sculptSceneId, storage.scene4PaletteByTheme, backgroundAppearanceMode])
 
   const editSliceBg = storage.appearance[backgroundAppearanceMode].bgColor
   useEffect(() => {
@@ -266,6 +273,35 @@ export function SculptControlsProvider({ children }: { children: ReactNode }) {
     [],
   )
 
+  const patchScene4PaletteForTheme = useCallback(
+    (
+      mode: BackgroundAppearanceMode,
+      patch: Partial<Record<0 | 1 | 2 | 3, { r?: number; g?: number; b?: number }>>,
+    ) => {
+      setStorage((prev) => {
+        const cur = prev.scene4PaletteByTheme[mode]
+        const next = [...cur] as typeof cur
+        for (const key of [0, 1, 2, 3] as const) {
+          const p = patch[key]
+          if (!p) continue
+          next[key] = {
+            r: p.r ?? cur[key].r,
+            g: p.g ?? cur[key].g,
+            b: p.b ?? cur[key].b,
+          }
+        }
+        return {
+          ...prev,
+          scene4PaletteByTheme: {
+            ...prev.scene4PaletteByTheme,
+            [mode]: next,
+          },
+        }
+      })
+    },
+    [],
+  )
+
   const resetEditSlice = useCallback(() => {
     setStorage((prev) => {
       const bp = fullSculptDebug ? editBreakpoint : liveBreakpoint
@@ -278,18 +314,6 @@ export function SculptControlsProvider({ children }: { children: ReactNode }) {
       }
     })
   }, [editBreakpoint, liveBreakpoint, fullSculptDebug])
-
-  const patchScene3Params = useCallback((patch: Parameters<typeof mergeScene3Params>[1]) => {
-    setStorage((prev) => ({
-      ...prev,
-      scene3: mergeScene3Params(prev.scene3, patch),
-    }))
-  }, [])
-
-  useEffect(() => {
-    const t = window.setTimeout(() => saveSculptStorageState(storage), 400)
-    return () => window.clearTimeout(t)
-  }, [storage])
 
   const value = useMemo(
     () => ({
@@ -315,8 +339,8 @@ export function SculptControlsProvider({ children }: { children: ReactNode }) {
       sculptSceneId,
       setSculptSceneId,
       fullSculptDebug,
-      scene3Params: storage.scene3,
-      patchScene3Params,
+      scene4PaletteByTheme: storage.scene4PaletteByTheme,
+      patchScene4PaletteForTheme,
     }),
     [
       backgroundAppearanceMode,
@@ -334,8 +358,8 @@ export function SculptControlsProvider({ children }: { children: ReactNode }) {
       sculptSource,
       sculptSceneId,
       fullSculptDebug,
-      storage.scene3,
-      patchScene3Params,
+      storage.scene4PaletteByTheme,
+      patchScene4PaletteForTheme,
     ],
   )
 

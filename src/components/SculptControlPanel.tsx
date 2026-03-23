@@ -21,11 +21,7 @@ import {
 import { compileSculptRaymarchConstants } from '@/lib/shaderParkRaymarchCompile'
 import { SCULPT_RENDER_PRESETS } from '@/lib/shaderParkRenderSettings'
 import { buildSculptClipboardPayload, extractAppearance, hexToRgb01 } from '@/lib/sculptControls'
-import {
-  getSculptScenePanelCopy,
-  sceneColorHex,
-  SCENE_3_PALETTE_ROW_LABELS,
-} from '@/lib/sculptScenePanelInfo'
+import { getSculptScenePanelCopy, sceneColorHex } from '@/lib/sculptScenePanelInfo'
 import {
   activeViewportBreakpoint,
   VIEWPORT_BREAKPOINT_ORDER,
@@ -78,7 +74,7 @@ const HEX6_INPUT = /^#?[0-9a-fA-F]{6}$/
 function normalizeHexInput(raw: string): string | null {
   const trimmed = raw.trim()
   const h = trimmed.startsWith('#') ? trimmed : `#${trimmed}`
-  return HEX6_INPUT.test(h) ? h.toLowerCase() : null
+  return HEX6_INPUT.test(h) ? h.toUpperCase() : null
 }
 
 function ColorRow({
@@ -142,43 +138,6 @@ function ColorRow({
   )
 }
 
-function Scene3IdleNumber({
-  label,
-  value,
-  min,
-  max,
-  step,
-  onChange,
-}: {
-  label: string
-  value: number
-  min: number
-  max: number
-  step: number
-  onChange: (n: number) => void
-}) {
-  return (
-    <div className="flex flex-wrap items-center gap-2">
-      <Label className="min-w-[11rem] max-w-[min(100%,14rem)] shrink-0 text-[0.65rem] text-muted-foreground">
-        {label}
-      </Label>
-      <input
-        type="number"
-        inputMode="decimal"
-        min={min}
-        max={max}
-        step={step}
-        value={value}
-        onChange={(e) => {
-          const v = Number(e.target.value)
-          if (Number.isFinite(v)) onChange(v)
-        }}
-        className="h-7 w-[4.5rem] rounded-md border border-input bg-background px-1.5 font-mono text-[0.65rem] tabular-nums text-foreground"
-      />
-    </div>
-  )
-}
-
 export function SculptControlPanel() {
   const { setTheme } = useTheme()
   const {
@@ -200,8 +159,8 @@ export function SculptControlPanel() {
     sculptSceneId,
     setSculptSceneId,
     fullSculptDebug,
-    scene3Params,
-    patchScene3Params,
+    scene4PaletteByTheme,
+    patchScene4PaletteForTheme,
   } = useSculptControls()
 
   const compiledRaymarch = useMemo(() => {
@@ -340,6 +299,17 @@ export function SculptControlPanel() {
         >
           3
         </Button>
+        <Button
+          type="button"
+          size="sm"
+          variant={sculptSceneId === 4 ? 'default' : 'secondary'}
+          className="shadow-md min-w-9 px-3 font-mono tabular-nums"
+          aria-pressed={sculptSceneId === 4}
+          aria-label="Scene 4 — phase palette slab (isolated copy)"
+          onClick={() => setSculptSceneId(4)}
+        >
+          4
+        </Button>
       </div>
       <DrawerContent side="left" className="gap-0 p-0">
         <div data-vaul-no-drag className="flex h-full min-h-0 flex-1 flex-col">
@@ -397,186 +367,76 @@ export function SculptControlPanel() {
                 {scenePanelCopy.drawerHeading}
               </h3>
               <p className="mt-1 text-xs text-muted-foreground">
-                {sculptSceneId === 3 ? (
-                  <>
-                    Palette and idle motion drive the GLSL <code className="text-foreground">palette</code>{' '}
-                    sample; values are saved in this browser. Scene 1 still blends material sliders on
-                    top of its sculpt.
-                  </>
-                ) : (
-                  <>
-                    Colours below are the values baked into this scene&apos;s sculpt (scene 1 also
-                    applies your material sliders on top).
-                  </>
-                )}
+                Colours below are the values baked into this scene&apos;s sculpt (scene 1 also applies
+                your material sliders on top).
               </p>
-              {sculptSceneId === 3 ? (
-                <>
-                  <div className="mt-3 grid gap-3">
-                    {SCENE_3_PALETTE_ROW_LABELS.map((label, idx) => {
-                      const c = scene3Params.palette[idx]
-                      const hex = rgb01ToHex(c.r, c.g, c.b)
-                      const slot = idx as 0 | 1 | 2 | 3
-                      return (
-                        <ColorRow
-                          key={label}
-                          label={label}
-                          value={hex}
-                          onChange={(h) => {
-                            const { r, g, b } = hexToRgb01(h)
-                            patchScene3Params({ palette: { [slot]: { r, g, b } } })
-                          }}
+              <>
+                {sculptSceneId === 4 ? (
+                  <div className="mt-3 space-y-4 rounded-md border border-border/70 bg-background/35 p-3">
+                    <p className="text-[0.65rem] font-semibold uppercase tracking-wide text-muted-foreground">
+                      Scene 4 palette (editable, HEX)
+                    </p>
+                    {(['dark', 'light'] as const).map((mode) => (
+                      <div key={mode} className="space-y-2 rounded border border-border/70 p-2.5">
+                        <p className="text-[0.65rem] font-semibold uppercase tracking-wide text-muted-foreground">
+                          {mode} mode
+                        </p>
+                        {scene4PaletteByTheme[mode].map((c, idx) => {
+                          const hex = rgb01ToHex(c.r, c.g, c.b).toUpperCase()
+                          const slot = idx as 0 | 1 | 2 | 3
+                          const rowLabel = `Palette ${String.fromCharCode(97 + idx)}`
+                          return (
+                            <ColorRow
+                              key={`${mode}-${slot}`}
+                              label={rowLabel}
+                              value={hex}
+                              onChange={(h) => {
+                                const { r, g, b } = hexToRgb01(h)
+                                patchScene4PaletteForTheme(mode, { [slot]: { r, g, b } })
+                              }}
+                            />
+                          )
+                        })}
+                      </div>
+                    ))}
+                  </div>
+                ) : null}
+                <div className="mt-3 flex flex-wrap gap-2">
+                  {scenePanelCopy.colors.map((c) => {
+                    const hex = sceneColorHex(c.rgb)
+                    return (
+                      <div
+                        key={c.label}
+                        className="flex max-w-full items-center gap-2 rounded-md border border-border bg-background/60 px-2 py-1.5"
+                      >
+                        <span
+                          className="size-6 shrink-0 rounded border border-border shadow-sm"
+                          style={{ backgroundColor: hex }}
+                          aria-hidden
                         />
-                      )
-                    })}
-                  </div>
-                  <div className="mt-4 space-y-2 rounded-md border border-border/70 bg-background/35 p-3">
-                    <p className="text-[0.65rem] font-semibold uppercase tracking-wide text-muted-foreground">
-                      Idle / automatic motion
-                    </p>
-                    <div className="grid gap-2 sm:grid-cols-2">
-                      <Scene3IdleNumber
-                        label="φ term: amplitude"
-                        min={0}
-                        max={3}
-                        step={0.01}
-                        value={scene3Params.idle.phiAmp}
-                        onChange={(phiAmp) => patchScene3Params({ idle: { phiAmp } })}
-                      />
-                      <Scene3IdleNumber
-                        label="φ term: time scale"
-                        min={0}
-                        max={4}
-                        step={0.01}
-                        value={scene3Params.idle.phiTime}
-                        onChange={(phiTime) => patchScene3Params({ idle: { phiTime } })}
-                      />
-                      <Scene3IdleNumber
-                        label="φ term: per-line phase"
-                        min={0}
-                        max={4}
-                        step={0.01}
-                        value={scene3Params.idle.phiPerLine}
-                        onChange={(phiPerLine) => patchScene3Params({ idle: { phiPerLine } })}
-                      />
-                      <Scene3IdleNumber
-                        label="Angle layer 1: amplitude"
-                        min={0}
-                        max={4}
-                        step={0.01}
-                        value={scene3Params.idle.a1Amp}
-                        onChange={(a1Amp) => patchScene3Params({ idle: { a1Amp } })}
-                      />
-                      <Scene3IdleNumber
-                        label="Angle layer 1: time scale"
-                        min={0}
-                        max={4}
-                        step={0.01}
-                        value={scene3Params.idle.a1Time}
-                        onChange={(a1Time) => patchScene3Params({ idle: { a1Time } })}
-                      />
-                      <Scene3IdleNumber
-                        label="Angle layer 2: amplitude"
-                        min={0}
-                        max={4}
-                        step={0.01}
-                        value={scene3Params.idle.a2Amp}
-                        onChange={(a2Amp) => patchScene3Params({ idle: { a2Amp } })}
-                      />
-                      <Scene3IdleNumber
-                        label="Angle layer 2: time scale"
-                        min={0}
-                        max={4}
-                        step={0.01}
-                        value={scene3Params.idle.a2Time}
-                        onChange={(a2Time) => patchScene3Params({ idle: { a2Time } })}
-                      />
-                      <Scene3IdleNumber
-                        label="Angle layer 2: φ coupling"
-                        min={0}
-                        max={4}
-                        step={0.01}
-                        value={scene3Params.idle.a2Phi}
-                        onChange={(a2Phi) => patchScene3Params({ idle: { a2Phi } })}
-                      />
-                      <Scene3IdleNumber
-                        label="Angle layer 3: amplitude"
-                        min={0}
-                        max={4}
-                        step={0.01}
-                        value={scene3Params.idle.a3Amp}
-                        onChange={(a3Amp) => patchScene3Params({ idle: { a3Amp } })}
-                      />
-                      <Scene3IdleNumber
-                        label="Angle layer 3: time scale"
-                        min={0}
-                        max={4}
-                        step={0.01}
-                        value={scene3Params.idle.a3Time}
-                        onChange={(a3Time) => patchScene3Params({ idle: { a3Time } })}
-                      />
-                      <Scene3IdleNumber
-                        label="Angle layer 3: p.x weight"
-                        min={0}
-                        max={4}
-                        step={0.01}
-                        value={scene3Params.idle.a3Px}
-                        onChange={(a3Px) => patchScene3Params({ idle: { a3Px } })}
-                      />
-                      <Scene3IdleNumber
-                        label="Angle layer 3: p.y weight"
-                        min={0}
-                        max={4}
-                        step={0.01}
-                        value={scene3Params.idle.a3Py}
-                        onChange={(a3Py) => patchScene3Params({ idle: { a3Py } })}
-                      />
-                    </div>
-                    <p className="pt-1 text-[0.65rem] text-muted-foreground">
-                      Geometry (fixed in shader): 6 vertical slits, spacing 0.22, half-height sz = 0.5,
-                      strength = 2.
-                    </p>
-                  </div>
-                </>
-              ) : (
-                <>
-                  <div className="mt-3 flex flex-wrap gap-2">
-                    {scenePanelCopy.colors.map((c) => {
-                      const hex = sceneColorHex(c.rgb)
-                      return (
-                        <div
-                          key={c.label}
-                          className="flex max-w-full items-center gap-2 rounded-md border border-border bg-background/60 px-2 py-1.5"
-                        >
-                          <span
-                            className="size-6 shrink-0 rounded border border-border shadow-sm"
-                            style={{ backgroundColor: hex }}
-                            aria-hidden
-                          />
-                          <div className="min-w-0">
-                            <p className="truncate text-xs font-medium text-foreground">{c.label}</p>
-                            <p className="font-mono text-[0.65rem] text-muted-foreground">{hex}</p>
-                          </div>
+                        <div className="min-w-0">
+                          <p className="truncate text-xs font-medium text-foreground">{c.label}</p>
+                          <p className="font-mono text-[0.65rem] text-muted-foreground">{hex}</p>
                         </div>
-                      )
-                    })}
-                  </div>
-                  <div className="mt-4">
-                    <p className="text-[0.65rem] font-semibold uppercase tracking-wide text-muted-foreground">
-                      Idle / automatic motion
-                    </p>
-                    <ul className="mt-1.5 list-inside list-disc space-y-1 text-[0.65rem] text-muted-foreground">
-                      {scenePanelCopy.idleMotion.map((m) => (
-                        <li key={m.label}>
-                          <span className="font-medium text-foreground/90">{m.label}</span>
-                          {' — '}
-                          {m.detail}
-                        </li>
-                      ))}
-                    </ul>
-                  </div>
-                </>
-              )}
+                      </div>
+                    )
+                  })}
+                </div>
+                <div className="mt-4">
+                  <p className="text-[0.65rem] font-semibold uppercase tracking-wide text-muted-foreground">
+                    Idle / automatic motion
+                  </p>
+                  <ul className="mt-1.5 list-inside list-disc space-y-1 text-[0.65rem] text-muted-foreground">
+                    {scenePanelCopy.idleMotion.map((m) => (
+                      <li key={m.label}>
+                        <span className="font-medium text-foreground/90">{m.label}</span>
+                        {' — '}
+                        {m.detail}
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              </>
               {scenePanelCopy.pointerMotion?.length ? (
                 <div className="mt-3">
                   <p className="text-[0.65rem] font-semibold uppercase tracking-wide text-muted-foreground">

@@ -208,106 +208,128 @@ ${SCENE_2_SHELL_CSG}
 })();
 `.trim()
 
-/**
- * Scene 3 — Six fixed vertical slits (unchanged `xoff` / `spacing`). Original sketch animated **palette
- * input** via `time`: `sz` pulse, per-line `sin(time*0.9)`, and `angle = sin(t*0.84)*phi + 3*sin(t)` —
- * that drives `palette(angle,…)` (the shifting coloration). **`sz` is fixed** (`0.5`); per-line phase
- * and **`angle`** still use **`mouse`**. Slow **`sin`/`nsin` on `time`** (no branching) keeps the
- * palette drifting when the pointer is still. `lightDirection` stays fixed.
- */
+/** Scene 3 — literal original phase-palette slab snippet. */
 const SCENE_3_BODY = `
-var uMatR = input(0.6235294117647059, 0, 1);
-var uMatG = input(0.9411764705882353, 0, 1);
-var uMatB = input(0.058823529411764705, 0, 1);
+let s = getSpace();
+const sz = 0.5 + nsin(time) * 0.2;
 
-var uHueShift = input(0.025, -1, 1);
-var uSat = input(1.37, 0, 2);
-var uValue = input(1.92, 0, 2);
-var uContrast = input(1.6, 0.35, 2.2);
-var uAmbient = input(0.015, 0, 0.35);
-var uRim = input(0, 0, 1);
-
-var uMetal = input(0.67, 0, 1);
-var uShine = input(0.66, 0, 1);
-var uBallMetal = input(0.69, 0, 1);
-
-var uPosX = input(0, -0.85, 0.85);
-var uPosY = input(0, -0.85, 0.85);
-var uPosZ = input(0, -0.85, 0.85);
-
-var uSp3Pal0R = input(0.6745098039215687, 0, 1);
-var uSp3Pal0G = input(0.7529411764705882, 0, 1);
-var uSp3Pal0B = input(0.7843137254901961, 0, 1);
-var uSp3Pal1R = input(0.6588235294117647, 0, 1);
-var uSp3Pal1G = input(0.5725490196078431, 0, 1);
-var uSp3Pal1B = input(0.1411764705882353, 0, 1);
-var uSp3Pal2R = input(0.5372549019607843, 0, 1);
-var uSp3Pal2G = input(0.2235294117647059, 0, 1);
-var uSp3Pal2B = input(0.40784313725490196, 0, 1);
-var uSp3Pal3R = input(0.2627450980392157, 0, 1);
-var uSp3Pal3G = input(0.1607843137254902, 0, 1);
-var uSp3Pal3B = input(0.1568627450980392, 0, 1);
-
-var uSp3IdlePhiAmp = input(0.38, 0, 3);
-var uSp3IdlePhiTime = input(0.52, 0, 4);
-var uSp3IdlePhiPerLine = input(0.55, 0, 4);
-var uSp3IdleA1Amp = input(1.15, 0, 4);
-var uSp3IdleA1Time = input(0.48, 0, 4);
-var uSp3IdleA2Amp = input(0.88, 0, 4);
-var uSp3IdleA2Time = input(0.67, 0, 4);
-var uSp3IdleA2Phi = input(0.28, 0, 4);
-var uSp3IdleA3Amp = input(0.52, 0, 4);
-var uSp3IdleA3Time = input(0.58, 0, 4);
-var uSp3IdleA3Px = input(0.22, 0, 4);
-var uSp3IdleA3Py = input(0.17, 0, 4);
-
-var spScene3Rgb = glslFuncES3(\`
-vec3 spScene3Palette(float t, vec3 a, vec3 b, vec3 c, vec3 d) {
-  return a + b * cos(c * t + d);
-}
-vec2 spScene3ComplexDiv(vec2 a, vec2 b) {
-  float dm = 1.0 / max(b.x * b.x + b.y * b.y, 1.0e-8);
+const complexDiv = (a, b) => {
+  const dm = 1.0 / (b.x * b.x + b.y * b.y);
   return dm * vec2(
     a.x * b.x + a.y * b.y,
     a.y * b.x - a.x * b.y
   );
-}
-vec3 spScene3Sample(vec3 p) {
-  float sz = 0.5;
-  float lineCount = 6.0;
-  float spacing = 0.22;
-  float strength = 2.0;
-  float phi = 0.0;
-  for (int ii = 0; ii < 6; ii++) {
-    float i = float(ii);
-    float xoff = (i - (lineCount - 1.0) * 0.5) * spacing;
-    vec2 va = vec2(p.x - xoff, p.y - sz);
-    vec2 vb = vec2(p.x - xoff, p.y + sz);
-    vec2 q = spScene3ComplexDiv(va, vb);
-    phi += strength * atan(q.y, q.x) + 0.35 * i * sin(mouse.x * 0.95 + mouse.y * 1.15) + uSp3IdlePhiAmp * sin(time * uSp3IdlePhiTime + i * uSp3IdlePhiPerLine);
-  }
-  phi /= lineCount;
-  float angle = sin(mouse.x * 2.52) * phi + 3.0 * sin(mouse.y * 3.14159265)
-    + uSp3IdleA1Amp * sin(time * uSp3IdleA1Time) + uSp3IdleA2Amp * sin(time * uSp3IdleA2Time + phi * uSp3IdleA2Phi)
-    + uSp3IdleA3Amp * nsin(time * uSp3IdleA3Time + p.x * uSp3IdleA3Px + p.y * uSp3IdleA3Py);
-  return spScene3Palette(angle,
-    vec3(uSp3Pal0R, uSp3Pal0G, uSp3Pal0B),
-    vec3(uSp3Pal1R, uSp3Pal1G, uSp3Pal1B),
-    vec3(uSp3Pal2R, uSp3Pal2G, uSp3Pal2B),
-    vec3(uSp3Pal3R, uSp3Pal3G, uSp3Pal3B)
-  );
-}
-\`);
+};
 
-shape(function() {
-  displace(0, 0, uPosZ);
-  lightDirection(0.4, 0.55, 0.52);
-  fresnel(0.35);
-  color(spScene3Rgb(getSpace()));
-  metal(0.28);
-  shine(0.58);
-  box(5.0, 5.0, 0.01);
-})();
+function palette(t, a, b, c, d) {
+  return a + b * cos(c * t + d);
+}
+
+const lineCount = 9.0;
+const spacing = 0.22;
+const strength = 2;
+
+let phi = 0.0;
+for (let i = 0.0; i < lineCount; i += 1.0) {
+  const xoff = (i - (lineCount - 1.0) * 0.5) * spacing;
+
+  const a = vec2(s.x - xoff, s.y - sz);
+  const b = vec2(s.x - xoff, s.y + sz);
+  const q = complexDiv(a, b);
+
+  phi += strength * atan(q.y, q.x) + 0.35 * i * sin(time * 0.9);
+}
+
+phi = phi / lineCount;
+
+const angle = sin(time * 0.84) * phi + 3.0 * sin(time);
+
+const v = palette(
+  angle,
+  vec3(0.50, 0.52, 0.53),
+  vec3(0.46, 0.22, 0.35),
+  vec3(0.82, 0.84, 0.65),
+  vec3(0.53, 0.23, 0.22)
+);
+
+color(v);
+box(vec3(5.0, 5.0, 0.01));
+`.trim()
+
+/** Scene 4 — same palette stack as scene 3, but φ stacks four concentric rings (not vertical slits). */
+const SCENE_4_BODY = `
+let s = getSpace();
+const tm = time * 0.5;
+var uS4Pal0R = input(0.50, 0, 1);
+var uS4Pal0G = input(0.52, 0, 1);
+var uS4Pal0B = input(0.53, 0, 1);
+var uS4Pal1R = input(0.46, 0, 1);
+var uS4Pal1G = input(0.22, 0, 1);
+var uS4Pal1B = input(0.35, 0, 1);
+var uS4Pal2R = input(0.82, 0, 1);
+var uS4Pal2G = input(0.84, 0, 1);
+var uS4Pal2B = input(0.65, 0, 1);
+var uS4Pal3R = input(0.53, 0, 1);
+var uS4Pal3G = input(0.23, 0, 1);
+var uS4Pal3B = input(0.22, 0, 1);
+const mx = mouse.x * 0.95;
+const my = mouse.y * 0.75;
+const mm = sqrt(mx * mx + my * my);
+const sz = 0.5 + nsin(tm + mx * 0.8 + my * 0.8) * (0.08 + mm * 0.18);
+
+const complexDiv = (a, b) => {
+  const dm = 1.0 / (b.x * b.x + b.y * b.y);
+  return dm * vec2(
+    a.x * b.x + a.y * b.y,
+    a.y * b.x - a.x * b.y
+  );
+};
+
+function palette(t, a, b, c, d) {
+  return a + b * cos(c * t + d);
+}
+
+const ringCount = 4.0;
+const ringSpacing = 0.55;
+const ringStart = 0.35;
+const strength = 2;
+
+const r = sqrt(s.x * s.x + s.y * s.y);
+
+let phi = 0.0;
+for (let i = 0.0; i < ringCount; i += 1.0) {
+  const ri = ringStart + i * ringSpacing;
+  const dr = r - ri;
+
+  const a = vec2(dr, s.y - sz);
+  const b = vec2(dr, s.y + sz);
+  const q = complexDiv(a, b);
+
+  phi += strength * atan(q.y, q.x) + 0.35 * i * sin(tm * 0.9);
+}
+
+phi = phi / ringCount;
+
+const angle =
+  sin(tm * 0.84) * phi +
+  3.0 * sin(tm) +
+  mx * 0.55 +
+  my * 0.42;
+
+const v = palette(
+  angle,
+  vec3(uS4Pal0R, uS4Pal0G, uS4Pal0B),
+  vec3(uS4Pal1R, uS4Pal1G, uS4Pal1B),
+  vec3(uS4Pal2R, uS4Pal2G, uS4Pal2B),
+  vec3(uS4Pal3R, uS4Pal3G, uS4Pal3B)
+);
+
+lightDirection(0.42 + mx * 0.22, 0.52 + my * 0.2, 0.5);
+fresnel(0.12 + abs(mx) * 0.16 + abs(my) * 0.14);
+metal(0.1);
+shine(0.42);
+color(v);
+box(vec3(5.0, 5.0, 0.01));
 `.trim()
 
 export type BackgroundSculptRaymarchOpts = {
@@ -353,6 +375,19 @@ setGeometryQuality(${opts.geometryQuality});
 setMaxIterations(${opts.maxIterations});
 ${stepLine}
 ${SCENE_3_BODY}
+`.trim()
+}
+
+export function buildScene4PaletteSculptSource(opts: BackgroundSculptRaymarchOpts): string {
+  const stepLine =
+    opts.stepSize != null && opts.stepSize > 0
+      ? `setStepSize(${opts.stepSize});`
+      : ''
+  return `
+setGeometryQuality(${opts.geometryQuality});
+setMaxIterations(${opts.maxIterations});
+${stepLine}
+${SCENE_4_BODY}
 `.trim()
 }
 

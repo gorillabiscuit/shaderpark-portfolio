@@ -39,16 +39,13 @@ const SCENE_1_DEFAULT_MAT: [number, number, number] = [
 
 const SCENE_2_YELLOW: [number, number, number] = [1.0, 0.92, 0.08]
 
-/** Scene 3 `palette(t, a,b,c,d)` — vectors a–d in GLSL (labels for the editable panel). */
+/** Scene 3 `palette(t, a,b,c,d)` — hardcoded vec3s in GLSL (reference swatches). */
 const SCENE_3_PALETTE: { label: string; rgb: [number, number, number] }[] = [
-  { label: 'Palette a (offset)', rgb: [172 / 255, 192 / 255, 200 / 255] },
-  { label: 'Palette b (cos amp)', rgb: [168 / 255, 146 / 255, 36 / 255] },
-  { label: 'Palette c (freq)', rgb: [137 / 255, 57 / 255, 104 / 255] },
-  { label: 'Palette d (phase)', rgb: [67 / 255, 41 / 255, 40 / 255] },
+  { label: 'Palette a (offset)', rgb: [0.5, 0.52, 0.53] },
+  { label: 'Palette b (cos amp)', rgb: [0.46, 0.22, 0.35] },
+  { label: 'Palette c (freq)', rgb: [0.82, 0.84, 0.65] },
+  { label: 'Palette d (phase)', rgb: [0.53, 0.23, 0.22] },
 ]
-
-/** Row labels for scene 3 palette colour pickers (order matches `palette` in storage). */
-export const SCENE_3_PALETTE_ROW_LABELS: readonly string[] = SCENE_3_PALETTE.map((p) => p.label)
 
 const COPY_BY_SCENE: Record<SculptSceneId, SculptScenePanelCopy> = {
   1: {
@@ -112,38 +109,51 @@ const COPY_BY_SCENE: Record<SculptSceneId, SculptScenePanelCopy> = {
     colors: SCENE_3_PALETTE.map(({ label, rgb }) => ({ label, rgb })),
     idleMotion: [
       {
-        label: 'φ per vertical slit (i = 0…5)',
-        detail: '+ 0.38 × sin(time × 0.52 + i × 0.55)',
+        label: 'Half-height sz',
+        detail: '0.5 + nsin(time) × 0.2',
       },
       {
-        label: 'palette angle — layer 1',
-        detail: '+ 1.15 × sin(time × 0.48)',
+        label: 'φ per line (i = 0…8)',
+        detail: 'strength × atan(q) + 0.35 × i × sin(time × 0.9); nine lines, spacing 0.22, strength 2',
       },
       {
-        label: 'palette angle — layer 2',
-        detail: '+ 0.88 × sin(time × 0.67 + φ × 0.28)',
-      },
-      {
-        label: 'palette angle — layer 3',
-        detail: '+ 0.52 × nsin(time × 0.58 + p.x×0.22 + p.y×0.17)',
+        label: 'palette angle',
+        detail: 'sin(time × 0.84) × (φ / 9) + 3 × sin(time)',
       },
       {
         label: 'Geometry',
-        detail: '6 slits, spacing 0.22, sz = 0.5, strength = 2 (fixed vertical extent)',
+        detail: 'Thin slab box 5×5×0.01; panel Z uses uPosZ only',
+      },
+    ],
+  },
+  4: {
+    fabTitle: 'Palette',
+    drawerHeading: 'Scene 4 — Concentric rings',
+    colors: SCENE_3_PALETTE.map(({ label, rgb }) => ({ label, rgb })),
+    idleMotion: [
+      {
+        label: 'Half-height sz',
+        detail: '0.5 + nsin(0.5×time) × 0.2',
+      },
+      {
+        label: 'φ per ring (i = 0…3)',
+        detail:
+          'r = √(x²+y²); dr = r − ri; same complexDiv/atan as scene 3 but radial; ri = 0.35 + i×0.55; + 0.35×i×sin(0.5×time×0.9)',
+      },
+      {
+        label: 'palette angle',
+        detail: 'sin(0.5×time × 0.84) × (φ / 4) + 3 × sin(0.5×time) — global half-speed',
+      },
+      {
+        label: 'Geometry',
+        detail: 'Thin slab box 5×5×0.01',
       },
     ],
     pointerMotion: [
       {
-        label: 'φ mouse term',
-        detail: '+ 0.35 × i × sin(mouse.x×0.95 + mouse.y×1.15) per line',
-      },
-      {
-        label: 'angle mouse term',
-        detail: 'sin(mouse.x×2.52)×φ + 3×sin(mouse.y×π)',
-      },
-      {
-        label: 'Shading',
-        detail: 'Fixed lightDirection (0.4, 0.55, 0.52); fresnel 0.35; metal 0.28; shine 0.58',
+        label: 'Mouse → colour & light only',
+        detail:
+          'mx = 0.95×mouse.x, my = 0.75×mouse.y; rings stay fixed in space — mouse shifts palette phase, lightDirection, fresnel rim, metal/shine',
       },
     ],
   },

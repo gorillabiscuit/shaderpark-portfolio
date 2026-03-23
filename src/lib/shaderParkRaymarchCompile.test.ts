@@ -23,4 +23,9 @@ describe('compileSculptRaymarchConstants', () => {
     const out = compileSculptRaymarchConstants(sculptSourceForScene(3))
     expect(out.error).toBeUndefined()
   })
+
+  it('compiles scene 4 sculpt without shader-park error', () => {
+    const out = compileSculptRaymarchConstants(sculptSourceForScene(4))
+    expect(out.error).toBeUndefined()
+  })
 })
